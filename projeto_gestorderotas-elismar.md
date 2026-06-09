@@ -2,7 +2,21 @@ Inserir no projeto as informações:
 
 
 
+
+
 Nome do Projeto: gestorderotas-elismar
+
+
+
+A caminho do diretório local:
+C:\\Users\\filip\\.gemini\\antigravity\\scratch\\gestorderotas-elismar
+
+Inserir na tela de Login minha assinatura:
+Developed by Gileade Application = texto minúsculo, cor azul, posicionamento no rodapé, a palavra "Gileade" conterá o link (https://gileade-hub.vercel.app/), que irá direcionar ao site do criador.
+
+Inserir na aplicação banner flutuante Contendo O versículo do dia, Atualizado automaticamente Diariamente pela nossa aplicação Pela, Opção de fechar o banner, Colocar contador regressivo com estimativa necessário para ler o texto.
+
+
 
 
 
@@ -126,5 +140,51 @@ gestorderotas-elismar/
 
 
 
+obs: tela login do usuário Desabilitar obrigatoriedade de inserir chave única de autenticação
 
+
+
+:: Inicializa o repositório local
+
+git init
+
+
+
+:: Adiciona todos os arquivos estruturados ao índice
+
+git add .
+
+
+
+:: Cria o primeiro commit com as especificações da Gileade Application
+
+git commit -m "feat: estrutura spa react, login elismar e sdk firebase"
+
+
+
+:: Define a branch principal como main
+
+git branch -M main
+
+
+
+:: Vincula o seu repositório remoto oficial
+
+git remote add origin https://github.com/FGileade/gestorderotas-elismar.git
+
+
+
+:: Envia o código para o GitHub (forçando se necessário no primeiro push)
+
+git push -u origin main
+
+
+
+REdeply Git Hub
+
+git add index.html
+
+git commit -m "fix: ajustar caminho relativo do main.jsx para build da vercel"
+
+git push origin main
 
