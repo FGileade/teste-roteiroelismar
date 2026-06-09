@@ -1,11 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Limpeza de diretivas de build conflitantes - Estilização tratada dinamicamente via CDN */
 
-body {
-  -webkit-tap-highlight-color: transparent;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-}
 .glow-green {
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
 }
