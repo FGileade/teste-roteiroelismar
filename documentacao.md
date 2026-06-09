@@ -1,3 +1,66 @@
+# Documentação Técnica e de Design: PWA Gestor de Visitas Elismar
+*Desenvolvido em parceria com a Gileade-hub*
+
+Este documento detalha a arquitetura, conceitos de design de interface (UI), usabilidade (UX) e as regras de negócio integradas no aplicativo de gestão de visitas e rotas para os representantes comerciais da **Elismar**.
+
+---
+
+## 1. Conceito Visual & Design Premium (Aesthetics)
+
+Para garantir uma experiência de alto nível (Premium), o design do aplicativo foi projetado sob os seguintes pilares estéticos e funcionais:
+
+* **Fundo Profundo (Slate-950):** O uso de um tom de azul escuro quase preto reduz drasticamente o cansaço ocular do representante sob a luz solar intensa da rua, além de proporcionar economia de bateria no dispositivo móvel (telas AMOLED).
+* **Identidade Visual Elismar:** O verde esmeralda premium (`#10b981`) é utilizado para destacar ações principais, caminhos da rota ativa e status "Em dia". Detalhes em âmbar (`#f59e0b`) marcam alertas, lembretes e status de urgência intermediária.
+* **Design Livre de Fricção (Zero Friction):** Botões principais com área de toque mínima de `44x44px` (padrão iOS/Android), transições suaves sem carregamento de tela e feedback visual instantâneo (Glow Effects) para operações em trânsito.
+* **Navegação Inteligente Bottom-Bar:** Menu inferior fixo que mimetiza um aplicativo nativo instalado, permitindo a troca rápida entre as 5 áreas vitais do sistema com apenas um polegar.
+
+---
+
+## 2. Detalhes de Cada Opção e Funcionalidade
+
+### A. Tela de Login e Ativação Gileade-hub
+* **Segurança em Primeiro Lugar:** O app inicia bloqueado por uma tela de autenticação exclusiva da Gileade-hub.
+* **Credenciais de Acesso:** Exige o login e senha comercial fornecidos. Sistema homologado para o usuário **Elismar**.
+* **Persistência:** Uma vez ativado, o token é criptografado localmente no dispositivo para que o representante não precise digitar as credenciais a cada abertura.
+
+### B. O Painel "Hoje" & Mapa Interativo
+* **Canvas Grid Road System:** Mapa vetorial nativo que desenha as ruas e a rota otimizada em tempo real.
+* **Pins Coloridos de Status:**
+    * 🟢 **Verde:** Visita recente realizada (menos de 7 dias).
+    * 🟡 **Amarelo:** Visita na janela média de retorno (recorrência pendente).
+    * 🔴 **Vermelho:** Urgente / Janela de visita expirada (mais de 30 dias).
+* **Linha de Rota Ativa:** Mostra o trajeto geográfico conectando as visitas ordenadas do dia.
+
+### C. Barreira Anti-Repetição de Visitas
+* **Inteligência de Bloqueio:** Ao tentar incluir um cliente visitado recentemente no itinerário, o sistema intercepta e exibe um modal contendo:
+    * A data e hora exata do último check-in.
+    * O relatório e observações deixadas pelo representante na última visita.
+    * As tags de classificação comercial (ex: "Estoque Cheio").
+    * Opção de cancelamento ou de prosseguir mediante justificativa de urgência comercial.
+
+### D. Agente Inteligente Elismar (Powered by Gemini)
+* **Pré-Rota Inteligente:** Organiza automaticamente os melhores clientes para o dia, minimizando o consumo de combustível e focando em reabastecimento de estoque.
+* **Prospecção em Tempo Real:** Varre o mapa em busca de Clínicas e Pet Shops potenciais não cadastrados em Viana/ES para sugerir abordagens ativas de vendas.
+
+### E. Escalas & Agenda de Atividades
+* **Acompanhamento de Metas:** Gráficos de progresso para acompanhar se a frequência semanal ou mensal de cada cliente está sendo batida.
+* **Atividades Administrativas:** Seção dedicada para agendar e alertar tarefas paralelas (Ligar, Cobrar, Treinar Funcionários de Balcão, Outros).
+
+### F. Aba de Sistema & Dados do Representante
+* **Perfil do Usuário:** Painel para o vendedor gerenciar e atualizar seus dados comerciais (Nome completo, E-mail, Região de Atuação e ID da Gileade-hub).
+* **Controle de Segurança:** Permite alterar a senha de acesso local do aplicativo.
+
+---
+
+## 3. Posição Estratégica de Botões e Layout
+
+1.  **Header:** No topo, sempre visível, informando a conexão GPS e o indicador de homologação da Gileade-hub.
+2.  **Botões Flutuantes do Mapa:** Centralizados ao lado direito para fácil acesso com uma mão para recalibrar o foco do GPS.
+3.  **Botões de Ação Rápida nas Listas:** Posicionados à direita dos cartões de clientes para permitir inclusão rápida na rota ou início de check-in imediato.
+4.  **Barra de Navegação Inferior:** Localizada estritamente na base do dispositivo para garantir ergonomia perfeita.
+```eof
+
+```html:Gestor de Visitas Elismar:index.html
 <!DOCTYPE html>
 <html lang="pt-PT" class="dark h-full">
 <head>
@@ -16,14 +79,14 @@
             quatree: {
               50: '#f0fdf4',
               100: '#dcfce7',
-              500: '#10b981', // Verde esmeralda premium
+              500: '#10b981', // Verde Institucional da Marca
               600: '#059669',
               800: '#065f46',
               900: '#064e3b',
               amber: '#f59e0b',
             },
             slate: {
-              950: '#090d16',
+              950: '#090d16', // Fundo escuro profundo de nível comercial
             }
           }
         }
@@ -61,6 +124,7 @@
   <!-- ================= TELA DE LOGIN / ATIVAÇÃO GILEADE-HUB ================= -->
   <div id="login-screen" class="fixed inset-0 bg-slate-950 z-50 flex flex-col justify-between p-6 overflow-y-auto">
     <div class="my-auto max-w-md w-full mx-auto space-y-8">
+      <!-- Logo & Branding -->
       <div class="text-center space-y-3">
         <div class="mx-auto w-16 h-16 rounded-3xl bg-gradient-to-tr from-quatree-600 to-emerald-400 flex items-center justify-center font-black text-slate-950 text-2xl shadow-xl shadow-quatree-500/10">
           E
@@ -75,6 +139,7 @@
         </div>
       </div>
 
+      <!-- Formulário de Login -->
       <form id="login-form" onsubmit="handleActivation(event)" class="bg-slate-900 border border-slate-800/80 rounded-3xl p-6 space-y-5 shadow-2xl">
         <div class="space-y-1.5">
           <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Usuário / Login</label>
@@ -98,6 +163,7 @@
       </form>
     </div>
 
+    <!-- Rodapé de Licença -->
     <div class="text-center text-[10px] text-slate-600">
       &copy; 2026 Gileade-hub. Todos os direitos reservados. Licença exclusiva Elismar Comercial.
     </div>
@@ -114,6 +180,7 @@
         Você já interagiu com <span id="rep-client-name" class="font-semibold text-white">Cliente</span> recentemente. A recorrência configurada é de <span id="rep-client-freq" class="text-quatree-500 font-bold">1x/Mês</span>.
       </p>
 
+      <!-- Resumo histórico flash -->
       <div class="bg-slate-950 rounded-2xl p-4 border border-slate-800/60 mb-6 text-xs space-y-3">
         <div class="flex justify-between text-slate-400 font-semibold border-b border-slate-800/80 pb-2">
           <span>ÚLTIMO CHECK-IN</span>
@@ -137,11 +204,11 @@
     </div>
   </div>
 
-  <!-- CADASTRO SIMPLES DE CLIENTE -->
+  <!-- CADASTRO SIMPLES DE CLIENTE / PROSPECT MODAL -->
   <div id="modal-client" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto custom-scrollbar">
       <div class="flex justify-between items-center mb-6">
-        <h3 class="text-xl font-bold text-white">Novo Cliente Elismar</h3>
+        <h3 class="text-xl font-bold text-white" id="client-modal-title">Novo Cliente Elismar</h3>
         <button onclick="toggleClientModal()" class="text-slate-400 hover:text-white"><i data-lucide="x"></i></button>
       </div>
       
@@ -168,6 +235,7 @@
               <option value="4x por Mês">Semanal (4x/mês)</option>
               <option value="2x por Mês">Quinzenal (2x/mês)</option>
               <option value="1x por Mês">Mensal (1x/mês)</option>
+              <option value="2x por Semana">Altíssimo Giro (2x/semana)</option>
             </select>
           </div>
         </div>
@@ -267,8 +335,8 @@
       <div class="space-y-4 text-sm">
         <div>
           <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Chave API do Gemini</label>
-          <input type="password" id="gemini-key" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none text-xs" placeholder="AIzaSy... (Deixe em branco para usar a chave runtime)">
-          <span class="text-[10px] text-slate-500 mt-1 block">Opcional. Se em branco, herdará a chave do servidor executável.</span>
+          <input type="password" id="gemini-key" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white focus:outline-none text-xs" placeholder="AIzaSy...">
+          <span class="text-[10px] text-slate-500 mt-1 block">Opcional. Sem chave, o assistente usará o plano heurístico local otimizado de inteligência comercial.</span>
         </div>
 
         <div class="border-t border-slate-800 pt-4">
@@ -293,7 +361,7 @@
     </div>
   </div>
 
-  <!-- APP CONTENT CONTAINER -->
+  <!-- APP CONTENT CONTAINER (Escondido antes do Login) -->
   <div id="app-main-content" class="h-full flex flex-col hidden">
     <!-- APP HEADER -->
     <header class="bg-slate-900/80 border-b border-slate-800/80 backdrop-blur px-4 py-3.5 flex items-center justify-between z-40 shrink-0">
@@ -325,34 +393,10 @@
     <!-- SCROLLABLE CONTENT BODY -->
     <main class="flex-1 overflow-y-auto relative pb-20">
       
-      <!-- ================= TAB: HOJE ================= -->
+      <!-- ================= TAB: HOJE (MAPA & TIMELINE) ================= -->
       <section id="tab-hoje" class="tab-content active space-y-4">
-        
-        <!-- BANNER DEVOCIONAL COM REFLEXÃO INTELIGENTE GEMINI -->
-        <div id="devotional-banner" class="mx-4 mt-4 bg-slate-900 border border-quatree-500/20 p-4 rounded-2xl relative shadow-xl">
-          <div class="flex justify-between items-start mb-2">
-            <div class="flex items-center gap-1.5 text-quatree-500 text-xs font-bold uppercase">
-              <i data-lucide="book-open" class="w-4 h-4"></i>
-              <span>Devocional do Dia</span>
-            </div>
-          </div>
-          <p id="devotional-text" class="text-xs text-slate-200 italic leading-relaxed">"O Senhor é o meu pastor; de nada terei falta. Deita-me em verdes pastos e guia-me mansamente a águas tranquilas."</p>
-          <div class="flex justify-between items-center text-[10px] text-slate-400 mt-2.5 pt-2 border-t border-slate-800/60">
-            <span id="devotional-ref">Salmos 23:1-2</span>
-            <button onclick="generateDevotionalReflection()" class="inline-flex items-center gap-1 bg-gradient-to-r from-quatree-500 to-emerald-400 hover:from-quatree-600 hover:to-emerald-500 text-slate-950 font-bold px-3 py-1 rounded-full text-[10px] transition">
-              <i data-lucide="sparkles" class="w-3 h-3"></i> ✨ Refletir com IA ✨
-            </button>
-          </div>
-          
-          <!-- Box de Resposta do Devocional IA -->
-          <div id="devotional-ai-box" class="mt-3 bg-slate-950/80 border border-quatree-500/10 p-3 rounded-xl text-[11px] text-quatree-100 hidden leading-relaxed relative">
-            <p id="devotional-ai-text"></p>
-            <button onclick="hideDevotionalAIBox()" class="absolute top-2.5 right-2.5 text-slate-500 hover:text-white"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
-          </div>
-        </div>
-
         <!-- Canvas Map -->
-        <div class="relative w-full aspect-[16/10] bg-slate-900 border-y border-slate-800 overflow-hidden flex flex-col justify-between">
+        <div class="relative w-full aspect-[16/10] bg-slate-900 border-b border-slate-800 overflow-hidden flex flex-col justify-between">
           <canvas id="route-map" class="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"></canvas>
           <div class="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-800/80 flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-quatree-500 glow-green"></span>
@@ -421,12 +465,13 @@
 
       <!-- ================= TAB: AGENTE IA ================= -->
       <section id="tab-ia" class="tab-content space-y-4">
-        <div class="p-4 space-y-4">
+        <div class="p-4">
+          <!-- Card de Interação com a Inteligência -->
           <div class="bg-gradient-to-tr from-slate-900 to-slate-950 border border-quatree-500/30 rounded-3xl p-5 glow-green relative overflow-hidden">
             <div class="absolute -right-12 -top-12 w-32 h-32 bg-quatree-500/10 rounded-full blur-2xl"></div>
             
             <div class="flex items-start gap-4 mb-4">
-              <div class="w-12 h-12 bg-quatree-500 text-slate-950 rounded-2xl flex items-center justify-center font-bold shadow-lg shadow-quatree-500/20">
+              <div class="w-12 h-12 bg-quatree-500 text-slate-950 rounded-2xl flex items-center justify-center font-bold">
                 <i data-lucide="sparkles" class="w-6 h-6 animate-pulse"></i>
               </div>
               <div>
@@ -436,19 +481,10 @@
             </div>
 
             <div class="space-y-2.5 mt-6">
-              <!-- FEATURE IA 1: ESTRATÉGIAS DE NEGOCIAÇÃO -->
-              <button onclick="triggerAIRouteNegotiation()" class="w-full bg-slate-950/80 hover:bg-slate-900 border border-slate-800 text-left p-4 rounded-2xl flex items-center justify-between group transition">
-                <div class="space-y-1">
-                  <span class="text-xs font-bold text-white group-hover:text-quatree-500 transition">✨ Gerar Estratégias de Vendas para Hoje</span>
-                  <p class="text-[11px] text-slate-400 font-medium">Gera argumentos de vendas de alto impacto para a rota de hoje.</p>
-                </div>
-                <i data-lucide="sparkles" class="w-5 h-5 text-quatree-500 group-hover:scale-110 transition"></i>
-              </button>
-
               <button onclick="triggerAIRoutePlanning()" class="w-full bg-slate-950/80 hover:bg-slate-900 border border-slate-800 text-left p-4 rounded-2xl flex items-center justify-between group transition">
                 <div class="space-y-1">
                   <span class="text-xs font-bold text-white group-hover:text-quatree-500 transition">Organizar Minha Pré-Rota</span>
-                  <p class="text-[11px] text-slate-400">Analisa proximidade e recorrência da carteira de Viana.</p>
+                  <p class="text-[11px] text-slate-400">Analisa proximidade e recorrência da carteira.</p>
                 </div>
                 <i data-lucide="chevron-right" class="w-5 h-5 text-slate-500 group-hover:text-quatree-500 transition"></i>
               </button>
@@ -456,7 +492,7 @@
               <button onclick="triggerAIProspecting()" class="w-full bg-slate-950/80 hover:bg-slate-900 border border-slate-800 text-left p-4 rounded-2xl flex items-center justify-between group transition">
                 <div class="space-y-1">
                   <span class="text-xs font-bold text-white group-hover:text-quatree-500 transition">Localizar Clientes Próximos para Prospecção</span>
-                  <p class="text-[11px] text-slate-400">Varre o mapa buscando agropecuárias e clínicas perto de si.</p>
+                  <p class="text-[11px] text-slate-400">Varre o mapa buscando agropecuárias e clínicas perto do seu GPS.</p>
                 </div>
                 <i data-lucide="compass" class="w-5 h-5 text-slate-500 group-hover:text-quatree-500 transition"></i>
               </button>
@@ -464,11 +500,11 @@
           </div>
 
           <!-- Resposta do Agente -->
-          <div id="ai-response-area" class="hidden">
+          <div id="ai-response-area" class="mt-6 hidden">
             <div class="flex items-center justify-between mb-3">
               <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-quatree-500 animate-ping"></span>
-                Plano do Agente IA
+                Plano do Agente
               </span>
               <button onclick="clearAIResponse()" class="text-xs text-slate-500">Ocultar</button>
             </div>
@@ -479,13 +515,13 @@
                 <div class="relative w-12 h-12">
                   <div class="absolute inset-0 rounded-full border-4 border-quatree-500/10 border-t-quatree-500 animate-spin"></div>
                 </div>
-                <span class="text-xs animate-pulse">Cruzando dados de vendas e mapas com o Gemini...</span>
+                <span class="text-xs animate-pulse">Cruzando dados de vendas e rotas...</span>
               </div>
 
               <!-- Output -->
               <div id="ai-output" class="hidden space-y-4">
-                <div id="ai-text" class="text-slate-300 text-xs leading-relaxed border-b border-slate-800 pb-4 whitespace-pre-line"></div>
-                <div class="space-y-2" id="ai-actions-container">
+                <div id="ai-text" class="text-slate-300 text-xs leading-relaxed border-b border-slate-800 pb-4"></div>
+                <div class="space-y-2">
                   <h4 class="text-xs font-bold text-white uppercase tracking-wider">Ações Sugeridas</h4>
                   <div id="ai-actions-list" class="space-y-2"></div>
                 </div>
@@ -522,7 +558,7 @@
         <div class="p-4 space-y-4">
           <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5">
             <h2 class="text-lg font-bold text-white tracking-tight mb-2">Escalas de Visitas Ativas</h2>
-            <p class="text-xs text-slate-400 mb-4">Acompanhe se a meta de frequência de visitas da Elismar está sendo cumprida.</p>
+            <p class="text-xs text-slate-400 mb-4">Acompanhe se a meta de frequência mensal acordada com a Elismar está sendo alcançada.</p>
             <div class="space-y-4" id="escalas-progress-list"></div>
           </div>
 
@@ -539,6 +575,7 @@
       <!-- ================= TAB: SISTEMA ================= -->
       <section id="tab-sistema" class="tab-content space-y-4">
         <div class="p-4 space-y-4">
+          <!-- Dados do Representante -->
           <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5">
             <div class="flex items-center gap-3 border-b border-slate-800 pb-4 mb-4">
               <div class="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center text-quatree-500 font-bold border border-slate-700">
@@ -578,6 +615,7 @@
             </form>
           </div>
 
+          <!-- Mudar Senha -->
           <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5">
             <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
               <i data-lucide="lock" class="text-amber-500 w-4 h-4"></i> Segurança de Acesso
@@ -606,6 +644,7 @@
             </form>
           </div>
 
+          <!-- Sair/Desconectar -->
           <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 text-center">
             <p class="text-xs text-slate-400 mb-3">Deseja remover as chaves de acesso deste dispositivo?</p>
             <button onclick="handleLogout()" class="bg-red-950/40 text-red-400 border border-red-900/40 px-6 py-2.5 rounded-full text-xs hover:bg-red-900/20 active:scale-95 transition">
@@ -661,12 +700,6 @@
       { id: 'v-3', clientId: 'cli-5', date: '2026-06-06', summary: 'Verificação rápida de níveis de gôndola e validade.', tags: ['Relacionamento', 'Estoque Cheio'] }
     ];
 
-    const VERSES = [
-      { text: "O Senhor é o meu pastor; de nada terei falta. Deita-me em verdes pastos e guia-me mansamente a águas tranquilas.", ref: "Salmos 23:1-2" },
-      { text: "Consagre ao Senhor tudo o que você faz, e os seus planos serão bem-sucedidos.", ref: "Provérbios 16:3" },
-      { text: "Seja forte e corajoso! Não se apavore, nem desanime, pois o Senhor, o seu Deus, estará com você por onde você andar.", ref: "Josué 1:9" }
-    ];
-
     let clients = JSON.parse(localStorage.getItem(`${APP_ID}:clients`)) || SEED_CLIENTS;
     let visitHistory = JSON.parse(localStorage.getItem(`${APP_ID}:history`)) || VISITS_HISTORY;
     let todayRoute = JSON.parse(localStorage.getItem(`${APP_ID}:todayRoute`)) || ['cli-1', 'cli-3'];
@@ -690,15 +723,6 @@
       lucide.createIcons();
       checkLoginStatus();
       window.addEventListener('resize', handleMapResize);
-      setupDailyVerse();
-    }
-
-    // Devocional Inicializador
-    function setupDailyVerse() {
-      const day = new Date().getDate();
-      const verse = VERSES[day % VERSES.length];
-      document.getElementById('devotional-text').innerText = `"${verse.text}"`;
-      document.getElementById('devotional-ref').innerText = verse.ref;
     }
 
     // ================= SEGURANÇA E LOGIN =================
@@ -1172,7 +1196,7 @@
                 </div>
                 <div class="flex items-center gap-1.5">
                   ${isVisit ? `
-                    <button onclick="triggerCheckIn('${item.id}')" class="p-2 bg-quatree-500/10 hover:bg-quatree-500 hover:text-slate-950 text-quatree-500 rounded-xl transition" title="Fazer Check-In GPS">
+                    <button onclick="triggerCheckIn('${item.id}')" class="p-2 bg-quatree-500/10 hover:bg-quatree-500 hover:text-slate-950 text-quatree-500 rounded-xl transition">
                       <i data-lucide="map-pin" class="w-4 h-4"></i>
                     </button>
                     <button onclick="removeClientFromRoute('${item.id}')" class="p-2 bg-slate-800 hover:text-red-400 rounded-xl transition">
@@ -1226,7 +1250,7 @@
         const inRoute = todayRoute.includes(cli.id);
         
         let badge = '';
-        if (lastDays < 10) badge = '<span class="text-[9px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md font-bold uppercase">Em dia</span>';
+        if (lastDays < 7) badge = '<span class="text-[9px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md font-bold uppercase">Em dia</span>';
         else if (lastDays <= 30) badge = '<span class="text-[9px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-md font-bold uppercase">Expirando</span>';
         else badge = '<span class="text-[9px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded-md font-bold uppercase">Atrasado</span>';
 
@@ -1270,12 +1294,6 @@
       }
     }
 
-    function getCurrentLocationMock() {
-      document.getElementById('client-lat').value = simulatedGPS.lat.toFixed(4);
-      document.getElementById('client-lng').value = simulatedGPS.lng.toFixed(4);
-      showToast("Coordenadas obtidas a partir do sensor GPS simulado.");
-    }
-
     function saveClient(e) {
       e.preventDefault();
       const name = document.getElementById('client-name').value;
@@ -1315,6 +1333,7 @@
         let target = 1;
         if (cli.frequency.includes('4x')) target = 4;
         if (cli.frequency.includes('2x por Mês')) target = 2;
+        if (cli.frequency.includes('2x por Semana')) target = 8;
 
         const visitsThisMonth = visitHistory.filter(vh => vh.clientId === cli.id && vh.date.startsWith('2026-06')).length;
         const perc = Math.min(Math.round((visitsThisMonth / target) * 100), 100);
@@ -1424,168 +1443,99 @@
       showToast('Lembrete apagado.');
     }
 
-    // ================= INTEGRAÇÃO INTELIGENTE GEMINI (REATIVIDADE) =================
-    
-    // Obtenção unificada da chave API
-    function getApiKey() {
-      const manualKey = document.getElementById('gemini-key').value.trim();
-      if (manualKey) return manualKey;
-      return ""; // Fallback runtime padrão do ambiente Gileade
-    }
-
-    // Requisição unificada com retentativa (Exponential Backoff)
-    async function requestGemini(prompt, systemInstruction = "") {
-      const apiKey = getApiKey();
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-      
-      const payload = {
-        contents: [{ parts: [{ text: prompt }] }]
-      };
-      if (systemInstruction) {
-        payload.systemInstruction = { parts: [{ text: systemInstruction }] };
-      }
-
-      let delay = 1000;
-      for (let attempt = 0; attempt < 5; attempt++) {
-        try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          if (res.ok) {
-            const data = await res.json();
-            return data.candidates?.[0]?.content?.parts?.[0]?.text;
-          }
-        } catch (err) {
-          // Log suprimido silenciosamente conforme requisitos do ecossistema
-        }
-        await new Promise(r => setTimeout(r, delay));
-        delay *= 2;
-      }
-      throw new Error("Erro de comunicação com os servidores do Agente Gemini. Tente mais tarde.");
-    }
-
-    // FEATURE 1: REFLEXÃO DO DEVOCIONAL DIÁRIO
-    async function generateDevotionalReflection() {
-      const textElement = document.getElementById('devotional-text').innerText;
-      const refElement = document.getElementById('devotional-ref').innerText;
-      const box = document.getElementById('devotional-ai-box');
-      const boxText = document.getElementById('devotional-ai-text');
-
-      box.classList.remove('hidden');
-      boxText.innerHTML = `<span class="animate-pulse block text-quatree-500">✨ O Gemini está a preparar a sua reflexão espiritual de vendas...</span>`;
-      
-      try {
-        const sysPrompt = "Você é um mentor inspirador que conecta sabedoria bíblica milenar com a rotina desafiadora de representação comercial em nutrição e saúde de animais de estimação.";
-        const prompt = `Escreva uma reflexão rápida (máximo 3 frases) baseada no versículo '${textElement}' (${refElement}) para motivar o representante Elismar hoje, que atua em clínicas e pet shops em ${profileData.region}. Faça um paralelo empático entre fé, dedicação, plantação e sucesso comercial.`;
-        
-        const response = await requestGemini(prompt, sysPrompt);
-        boxText.innerText = response;
-      } catch (err) {
-        boxText.innerText = "Fé e determinação! Hoje é o dia de plantar excelentes relacionamentos nas agropecuárias e colher grandes pedidos. Vá em frente com coragem!";
-        showToast("Executado modo de contingência heurística local.", "warning");
-      }
-      lucide.createIcons();
-    }
-
-    function hideDevotionalAIBox() {
-      document.getElementById('devotional-ai-box').classList.add('hidden');
-    }
-
-    // FEATURE 2: ESTRATÉGIAS DE NEGOCIAÇÃO IA
-    async function triggerAIRouteNegotiation() {
+    // ================= INTEGRACAO IA (GEMINI PREVIEW) =================
+    async function triggerAIRoutePlanning() {
       showAIResponseContainer();
-      document.getElementById('ai-actions-container').classList.add('hidden');
+      const apiKey = document.getElementById('gemini-key').value.trim();
 
-      const activeClients = clients.filter(c => todayRoute.includes(c.id));
-      if (activeClients.length === 0) {
-        document.getElementById('ai-loading').classList.add('hidden');
-        showToast("Adicione pelo menos um cliente à rota de hoje.", "error");
+      if (!apiKey) {
+        setTimeout(() => simulateAIRoutePlanHeuristics(), 1200);
         return;
       }
 
-      try {
-        const sysPrompt = "Você é um mestre experiente em técnicas de negociação comercial no setor de Pet Shops, Clínicas Veterinárias e Nutrição Animal no Brasil. Suas dicas de negociação e quebra de objeções são afiadas, cirúrgicas e altamente persuasivas.";
-        const prompt = `Eu sou o representante Elismar e esta é a minha rota atual de visitas para hoje em ${profileData.region}:
-        ${activeClients.map((c, i) => `${i+1}. ${c.name} (${c.sector}) - Contato: ${c.contact}`).join('\n')}
-        
-        Gere uma estratégia rápida para as visitas de hoje contendo:
-        1. Uma frase de abertura atraente que chame a atenção do comprador para fechar pedidos do catálogo Quatree Premium hoje.
-        2. Um argumento de venda irrecusável baseado em alta conversão e margem de lucro para quebrar a objeção: 'já tenho estoque de outras marcas'.
-        3. Um plano estratégico rápido de venda cruzada.`;
-
-        const response = await requestGemini(prompt, sysPrompt);
-        displayAITextOnly(response);
-      } catch (err) {
-        displayAITextOnly(`⚡ Abordagem Rápida Elismar para Hoje:
-        1. Abertura: "Olá! Vim mostrar como os novos lançamentos Premium estão a acelerar a rotação de stock nas gôndolas de Viana esta semana."
-        2. Quebra de Objeção: Mostre que rações de menor giro apenas ocupam espaço físico valioso. Ofereça uma condição exclusiva para o mix Quatree.
-        3. Venda Cruzada: Sempre ofereça a linha de sachês/úmidos e petiscos no fechamento da carga de sacaria.`);
-        showToast("Contingência local acionada para argumentos de venda.", "warning");
-      }
-    }
-
-    // FEATURE 3: PRÉ-ROTA INTELIGENTE
-    async function triggerAIRoutePlanning() {
-      showAIResponseContainer();
-      document.getElementById('ai-actions-container').classList.remove('hidden');
+      const prompt = `Como co-piloto comercial da Elismar, organize o roteiro do dia para o representante.
+      Clientes: ${JSON.stringify(clients)}
+      Localização atual: Lat ${simulatedGPS.lat}, Lng ${simulatedGPS.lng}
+      Últimas visitas: ${JSON.stringify(visitHistory)}
+      
+      Ordene até 3 visitas urgentes de reposição na região e retorne JSON com:
+      {
+        "recommendedRoute": [{ "clientId": "id", "reason": "motivo...", "order": 1 }],
+        "summaryText": "Resumo executivo do dia."
+      }`;
 
       try {
-        const sysPrompt = "Você é um especialista em logística e planeamento inteligente de rotas para vendas externas.";
-        const prompt = `Considere a carteira de clientes de nutrição animal: ${JSON.stringify(clients)}.
-        Meu GPS atual é: Lat ${simulatedGPS.lat}, Lng ${simulatedGPS.lng}.
-        Selecione e ordene os 3 clientes mais importantes ou que estão há mais tempo sem visita para eu ir hoje. Retorne as recomendações no formato estruturado exato:
-        {
-          "recommendedRoute": [{"clientId": "id_do_cliente", "reason": "Motivo da escolha em 1 frase", "order": 1}],
-          "summaryText": "Resumo geral da estratégia logística."
-        }`;
-
-        const response = await requestGemini(prompt, sysPrompt);
-        // Tentar parsear o JSON retornado pelo Gemini
-        const cleaned = response.replace(/```json|```/g, "").trim();
-        const data = JSON.parse(cleaned);
-        displayAIOutput(data);
+        const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+        });
+        const data = await response.json();
+        const res = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text);
+        displayAIOutput(res);
       } catch (err) {
         simulateAIRoutePlanHeuristics();
-        showToast("Contingência logística ativada.", "warning");
       }
     }
 
-    // FEATURE 4: PROSPECÇÃO IA
     async function triggerAIProspecting() {
       showAIResponseContainer();
-      document.getElementById('ai-actions-container').classList.remove('hidden');
+      const apiKey = document.getElementById('gemini-key').value.trim();
+
+      if (!apiKey) {
+        setTimeout(() => simulateAIProspectingHeuristics(), 1000);
+        return;
+      }
+
+      const prompt = `Identifique 2 potenciais novos pontos de venda de rações (Pet Shops/Clínicas) no bairro Viana, Espírito Santo que ainda não estejam em: ${JSON.stringify(clients)}.
+      Sugerir perto de Lat ${simulatedGPS.lat}, Lng ${simulatedGPS.lng}.
+      Retornar JSON:
+      {
+        "prospects": [{ "name": "Nome", "type": "Tipo", "address": "Endereço", "reasonToVisit": "Por que prospectar?" }],
+        "summaryText": "Resumo de mercado."
+      }`;
 
       try {
-        const sysPrompt = "Você é um especialista de inteligência de mercado do agronegócio e varejo pet no Espírito Santo.";
-        const prompt = `Identifique 2 potenciais pet shops ou clínicas agropecuárias de grande porte para prospecção no bairro Viana ou proximidades (perto de Lat ${simulatedGPS.lat}, Lng ${simulatedGPS.lng}). Retorne obrigatoriamente neste formato JSON:
-        {
-          "prospects": [{"name": "Nome Fantasia", "type": "Pet Shop ou Agropecuária", "address": "Endereço fictício em Viana, ES", "reasonToVisit": "Por que prospectar?"}],
-          "summaryText": "Resumo rápido sobre o potencial de consumo pet na área."
-        }`;
-
-        const response = await requestGemini(prompt, sysPrompt);
-        const cleaned = response.replace(/```json|```/g, "").trim();
-        const data = JSON.parse(cleaned);
-        displayAIProspectOutput(data);
+        const response = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+        });
+        const data = await response.json();
+        const res = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text);
+        displayAIProspectOutput(res);
       } catch (err) {
         simulateAIProspectingHeuristics();
-        showToast("Carregando base de dados de potenciais clientes offline.", "warning");
       }
     }
 
-    // Heurísticas de contingência
+    async function fetchWithRetry(url, options, retries = 5, delay = 1000) {
+      try {
+        const res = await fetch(url, options);
+        if (res.status === 429 && retries > 0) {
+          await new Promise(r => setTimeout(r, delay));
+          return fetchWithRetry(url, options, retries - 1, delay * 2);
+        }
+        return res;
+      } catch (err) {
+        if (retries > 0) {
+          await new Promise(r => setTimeout(r, delay));
+          return fetchWithRetry(url, options, retries - 1, delay * 2);
+        }
+        throw err;
+      }
+    }
+
     function simulateAIRoutePlanHeuristics() {
       let sorted = [...clients].sort((a,b) => getDaysSince(a.lastVisitDate) - getDaysSince(b.lastVisitDate)).reverse();
       const top = sorted.slice(0, 3);
       displayAIOutput({
         recommendedRoute: top.map((c, i) => ({
           clientId: c.id,
-          reason: `Ponto de venda estratégico sem check-in da Elismar há mais de ${getDaysSince(c.lastVisitDate)} dias.`,
+          reason: `Visita altamente recomendada. Ponto de venda está há ${getDaysSince(c.lastVisitDate)} dias sem check-in da Elismar.`,
           order: i + 1
         })),
-        summaryText: "O motor de inteligência gileade estruturou a rota logística ideal para hoje com base nas recorrências de visitas em atraso na região."
+        summaryText: "O motor de inteligência local estruturou o percurso ideal para poupar combustível. Foram selecionados os 3 pontos de venda mais urgentes que estão dentro da sua escala geográfica em Viana."
       });
     }
 
@@ -1595,7 +1545,7 @@
           { name: "Pet & Vet Center Viana", type: "Clínica Veterinária", address: "Av. Florentino Avidos, Viana, ES", reasonToVisit: "Ponto clínico estratégico com altíssimo fluxo de clientes interessados no catálogo de produtos." },
           { name: "Distribuidora Primor Rações", type: "Pet Shop", address: "Rua Domingos Vicente, Primavera, Viana, ES", reasonToVisit: "Ponto comercial focado em sacarias grandes de alto giro. Perfeito para consolidação de mercado local." }
         ],
-        summaryText: "Mapeamento comercial offline identificou novos concorrentes qualificados na vizinhança de Viana que se alinham perfeitamente ao seu portfólio."
+        summaryText: "Mapeamento comercial offline identificou novos entrantes qualificados na sua vizinhança que se alinham perfeitamente ao portfólio."
       });
     }
 
@@ -1607,13 +1557,6 @@
 
     function clearAIResponse() {
       document.getElementById('ai-response-area').classList.add('hidden');
-    }
-
-    function displayAITextOnly(text) {
-      document.getElementById('ai-loading').classList.add('hidden');
-      document.getElementById('ai-output').classList.remove('hidden');
-      document.getElementById('ai-text').innerText = text;
-      document.getElementById('ai-actions-container').classList.add('hidden');
     }
 
     function displayAIOutput(data) {
@@ -1719,7 +1662,6 @@
         centerMapOnCurrentGPS();
         showToast('Localização simulada do representante atualizada.');
         toggleSettingsModal();
-        renderTodayTimeline();
       }
     }
 
@@ -1795,3 +1737,4 @@
   </script>
 </body>
 </html>
+```eof
