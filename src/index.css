@@ -1,4 +1,6 @@
-/* Limpeza de diretivas de build conflitantes - Estilização tratada dinamicamente via CDN */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 .glow-green {
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
