@@ -7,18 +7,30 @@ export default {
   theme: {
     extend: {
       colors: {
-        quatree: {
-          50: '#f0fdf4',
-          100: '#dcfce7',
-          500: '#10b981', // Verde esmeralda premium
-          600: '#059669',
-          800: '#065f46',
-          900: '#064e3b',
-          amber: '#f59e0b',
+        silver: {
+          50: '#f5f6f7',
+          100: '#e4e7eb',
+          200: '#cbd2d9',
+          300: '#9aa5b1',
+          400: '#7b8794',
+          500: '#616e7c',
+          600: '#48535e',
+          700: '#323f4b',
+          800: '#1f2933',  // Grafite metálico médio
+          900: '#121b22',  // Prata escuro profundo
+          950: '#0a0f12',  // Fundo super escuro metálico
         },
-        slate: {
-          950: '#090d16',
+        gold: {
+          300: '#f7e7a8',
+          400: '#e5c060',
+          500: '#d4af37',  // Dourado clássico premium
+          600: '#b89229',
+          700: '#91711c',
         }
+      },
+      boxShadow: {
+        'gold-relief': '0 0 10px rgba(212, 175, 55, 0.25), inset 0 1px 2px rgba(212, 175, 55, 0.1)',
+        'gold-glow': '0 0 15px rgba(212, 175, 55, 0.45)',
       }
     },
   },
