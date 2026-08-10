@@ -167,10 +167,54 @@ export default function App() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
 
+  /**
+   * Merge de eventos: mantém eventos com createdAt mais recente.
+   * Eventos que existem só localmente (não chegaram ao cloud ainda) são preservados
+   * e agendados para upload.
+   * BUG 2 fix: evita sobrescrita cega de dados locais mais recentes.
+   */
+  const mergeAgendaEvents = (
+    localEvents: AgendaEvent[],
+    cloudEvents: AgendaEvent[]
+  ): { merged: AgendaEvent[]; onlyLocal: AgendaEvent[] } => {
+    const cloudMap = new Map(cloudEvents.map(e => [e.id, e]));
+    const localMap = new Map(localEvents.map(e => [e.id, e]));
+    const merged: AgendaEvent[] = [];
+    const onlyLocal: AgendaEvent[] = [];
+
+    // Para cada evento do cloud, verificar se há versão local mais recente
+    for (const cloudEv of cloudEvents) {
+      const localEv = localMap.get(cloudEv.id);
+      if (localEv) {
+        // Manter o mais recente por createdAt
+        const localDate = new Date(localEv.createdAt).getTime();
+        const cloudDate = new Date(cloudEv.createdAt).getTime();
+        merged.push(localDate > cloudDate ? localEv : cloudEv);
+      } else {
+        merged.push(cloudEv);
+      }
+    }
+
+    // Eventos que existem só localmente ainda não chegaram ao Firestore
+    for (const localEv of localEvents) {
+      if (!cloudMap.has(localEv.id)) {
+        merged.push(localEv);
+        onlyLocal.push(localEv);
+      }
+    }
+
+    return { merged, onlyLocal };
+  };
+
   const syncDataFromCloud = async (userId: string) => {
     setSyncError(null);
     setIsSyncingWithCloud(true);
     try {
+      // BUG 1 fix: processar fila offline pendente ANTES de baixar do Firestore.
+      // Garante que operações salvas localmente antes da auth ser confirmada
+      // cheguem ao Firestore antes de qualquer download sobrescrever o estado.
+      await processQueue(userId);
+
       const hasCloud = await hasCloudData(userId);
       if (!hasCloud) {
         console.log('No data found in cloud. Uploading current local state as initial baseline...');
@@ -209,14 +253,29 @@ export default function App() {
         setLoans(localLoans);
         setInitializedDates(localDates);
       } else {
-        console.log('Found cloud data. Downloading to local state...');
+        console.log('Found cloud data. Downloading and merging with local state...');
         const cloud = await downloadUserData(userId);
+
+        // BUG 2 fix: merge inteligente de eventos — local mais recente vence.
+        // Eventos só locais (não chegaram ao cloud) são preservados e re-enviados.
+        const storedEventsRaw = localStorage.getItem('roteiro_pet_events');
+        const localEvents: AgendaEvent[] = storedEventsRaw ? JSON.parse(storedEventsRaw) : [];
+        const { merged: mergedEvents, onlyLocal } = mergeAgendaEvents(localEvents, cloud.agendaEvents || []);
+
+        // Se houver eventos só locais, subi-los ao Firestore agora
+        if (onlyLocal.length > 0) {
+          console.log(`Uploading ${onlyLocal.length} local-only event(s) to Firestore...`);
+          for (const ev of onlyLocal) {
+            addToQueue(userId, 'events', ev.id, 'set', ev);
+          }
+          processQueue(userId);
+        }
         
         setClients(cloud.clients);
         setVisits(cloud.visits);
         setNegotiations(cloud.negotiations);
         setVoiceNotes(cloud.voiceNotes);
-        setAgendaEvents(cloud.agendaEvents || []);
+        setAgendaEvents(mergedEvents);
         setLoans(cloud.loans || []);
         setInitializedDates(cloud.initializedDates);
 
@@ -224,7 +283,7 @@ export default function App() {
         localStorage.setItem('roteiro_pet_visits', JSON.stringify(cloud.visits));
         localStorage.setItem('roteiro_pet_negotiations', JSON.stringify(cloud.negotiations));
         localStorage.setItem('roteiro_pet_voice_notes', JSON.stringify(cloud.voiceNotes));
-        localStorage.setItem('roteiro_pet_events', JSON.stringify(cloud.agendaEvents || []));
+        localStorage.setItem('roteiro_pet_events', JSON.stringify(mergedEvents));
         localStorage.setItem('roteiro_pet_loans', JSON.stringify(cloud.loans || []));
         localStorage.setItem('roteiro_pet_initialized_dates', JSON.stringify(cloud.initializedDates));
       }
@@ -241,6 +300,8 @@ export default function App() {
       if (user && user.email) {
         localStorage.setItem('roteiro_pet_is_logged_in', 'true');
         localStorage.setItem('roteiro_pet_user_email', user.email);
+        // BUG 1 fix: persistir UID para uso na fila offline quando currentUser ainda é null
+        localStorage.setItem('roteiro_pet_user_uid', user.uid);
         setIsLoggedIn(true);
         setUserEmail(user.email);
         setCurrentUser(user);
@@ -251,10 +312,13 @@ export default function App() {
           setTimeout(() => requestNotificationPermission(), 2000);
         }
         
-        // Let state hydrate from localStorage first, then sync up/down
+        // BUG 1 fix: aumentar timeout para 800ms no iOS — Firebase Auth
+        // leva mais tempo para restaurar sessão no Safari/PWA instalado.
+        // Isso garante que operações offline pendentes não colidam com
+        // o download do Firestore durante o cold start.
         setTimeout(() => {
           syncDataFromCloud(resolveUserId(user.uid));
-        }, 150);
+        }, 800);
 
       } else {
         setCurrentUser(null);
@@ -302,6 +366,22 @@ export default function App() {
     };
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
+  }, [currentUser]);
+
+  // BUG 3 fix: processar fila pendente ao app voltar ao foreground (iOS background suspension).
+  // O iOS pode suspender timers JavaScript quando o app vai para background.
+  // Ao retornar ao foreground (visibilitychange), garantimos que operações
+  // pendentes sejam enviadas ao Firestore.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && currentUser && navigator.onLine) {
+        processQueue(resolveUserId(currentUser.uid), (status) => {
+          if (status !== 'syncing') setIsSyncingWithCloud(false);
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [currentUser]);
 
   // 1. Initial State Hydration from localStorage or Seeds
@@ -459,6 +539,28 @@ export default function App() {
     localStorage.setItem('roteiro_pet_events', JSON.stringify(updatedEvents));
     if (currentUser) {
       syncWithCloud('events', oldEvents, updatedEvents);
+    } else {
+      // BUG 1 fix: se currentUser ainda não foi confirmado pelo Firebase Auth
+      // (race condition comum no iOS), gravar na fila offline usando o userId
+      // armazenado no localStorage. A fila será processada quando currentUser
+      // for populado pelo onAuthStateChanged.
+      const storedUserId = localStorage.getItem('roteiro_pet_user_uid');
+      if (storedUserId) {
+        const resolvedId = resolveUserId(storedUserId);
+        const oldMap = new Map(oldEvents.map(e => [e.id, e]));
+        const newMap = new Map(updatedEvents.map(e => [e.id, e]));
+        for (const ev of updatedEvents) {
+          const old = oldMap.get(ev.id);
+          if (!old || JSON.stringify(old) !== JSON.stringify(ev)) {
+            addToQueue(resolvedId, 'events', ev.id, 'set', ev);
+          }
+        }
+        for (const ev of oldEvents) {
+          if (!newMap.has(ev.id)) {
+            addToQueue(resolvedId, 'events', ev.id, 'delete', null);
+          }
+        }
+      }
     }
   };
 

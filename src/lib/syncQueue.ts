@@ -85,10 +85,20 @@ let isProcessing = false;
 let processTimeout: any = null;
 
 export async function processQueue(userId: string, onStatusChange?: (status: string) => void) {
+  // BUG 3 fix: verificar quantas operações pendentes existem para este usuário.
+  // Se for apenas 1, executar sem debounce — evita que o iOS suspenda o app
+  // antes do timeout de 400ms disparar (comportamento comum ao fechar o app logo após salvar).
+  const immediateCheck = getSyncQueue().filter(
+    op => op.userId === userId && (op.status === 'pending' || op.status === 'failed')
+  );
+  const useDebounce = immediateCheck.length > 1;
+
   // Clear existing timeout to debounce rapid additions to the queue
   if (processTimeout) {
     clearTimeout(processTimeout);
   }
+
+  const delay = useDebounce ? 400 : 0; // 0ms para operação única, 400ms para rajada
 
   processTimeout = setTimeout(async () => {
     if (isProcessing) return;
@@ -179,5 +189,5 @@ export async function processQueue(userId: string, onStatusChange?: (status: str
       isProcessing = false;
       processTimeout = null;
     }
-  }, 400); // 400ms debounce window to accumulate rapid updates (e.g. route initialization)
+  }, delay); // 0ms para operação única (iOS-safe), 400ms para múltiplas em rajada
 }
