@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, MicOff, Search, Trash2, Edit2, Link2, Check, Sparkles, Volume2, Calendar } from 'lucide-react';
 import { Client, VoiceNote, NegotiationHistory } from '../types';
+import { getClientDisplayName } from '../utils';
 
 interface VoiceNotesModalProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export default function VoiceNotesModal({
   const [editingText, setEditingText] = useState('');
   const [linkingNoteId, setLinkingNoteId] = useState<string | null>(null);
   const [selectedClientId, setSelectedClientId] = useState('');
+  const [noteClientSearch, setNoteClientSearch] = useState('');
 
   // Speech Recognition Ref
   const recognitionRef = useRef<any>(null);
@@ -169,10 +171,11 @@ export default function VoiceNotesModal({
     const client = clients.find(c => c.id === selectedClientId);
     if (!client) return;
 
-    onLinkNoteToClient(linkingNoteId, client.id, client.name);
+    onLinkNoteToClient(linkingNoteId, client.id, getClientDisplayName(client));
     setLinkingNoteId(null);
     setSelectedClientId('');
-    alert(`Nota vinculada com sucesso ao histórico do cliente ${client.name}!`);
+    setNoteClientSearch('');
+    alert(`Nota vinculada com sucesso ao histórico do cliente ${getClientDisplayName(client)}!`);
   };
 
   if (!isOpen) return null;
@@ -453,6 +456,16 @@ export default function VoiceNotesModal({
                         {isLinking && (
                           <div className="bg-slate-100 p-2.5 rounded-lg space-y-2 mt-2 border border-slate-200 animate-slide-down">
                             <label className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Escolha o Cliente para Direcionar a Nota</label>
+                            <div className="relative mb-1">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                              <input
+                                type="text"
+                                placeholder="Filtrar cliente..."
+                                value={noteClientSearch}
+                                onChange={(e) => setNoteClientSearch(e.target.value)}
+                                className="w-full pl-8 pr-2.5 py-1 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                            </div>
                             <select
                               id="link_client_select"
                               value={selectedClientId}
@@ -460,14 +473,24 @@ export default function VoiceNotesModal({
                               className="w-full text-xs p-2 bg-white border border-slate-300 rounded focus:outline-none"
                             >
                               <option value="">-- Selecione o Cliente --</option>
-                              {clients.map(c => (
-                                <option key={c.id} value={c.id}>{c.name} ({c.city || 'Cariacica'})</option>
-                              ))}
+                               {clients
+                                .filter(c => {
+                                  return c.name.toLowerCase().includes(noteClientSearch.toLowerCase()) ||
+                                    (c.legalName && c.legalName.toLowerCase().includes(noteClientSearch.toLowerCase()));
+                                })
+                                .sort((a, b) => getClientDisplayName(a).localeCompare(getClientDisplayName(b), 'pt-BR'))
+                                .map(c => (
+                                  <option key={c.id} value={c.id}>{getClientDisplayName(c)} ({c.city || 'Cariacica'})</option>
+                                ))}
                             </select>
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 id="cancel_link"
-                                onClick={() => setLinkingNoteId(null)}
+                                onClick={() => {
+                                  setLinkingNoteId(null);
+                                  setSelectedClientId('');
+                                  setNoteClientSearch('');
+                                }}
                                 className="px-2 py-1 text-[9px] font-bold text-slate-500 hover:bg-slate-200 rounded"
                               >
                                 Cancelar

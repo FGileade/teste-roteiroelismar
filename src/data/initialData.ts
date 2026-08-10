@@ -759,9 +759,9 @@ export const WEEKDAYS_PT = {
 };
 
 export const FREQUENCIES_PT = {
-  weekly: 'A cada semana',
-  biweekly: 'A cada 2 semanas',
-  monthly: 'A cada 4 semanas',
+  weekly: 'Semanal',
+  biweekly: 'Quinzenal',
+  monthly: 'Mensal',
   adhoc: 'Sem rota recorrente'
 };
 

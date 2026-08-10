@@ -40,7 +40,8 @@ import {
   getWazeUrl, 
   getWhatsAppUrl,
   getDistanceInKm,
-  getLocalTodayString 
+  getLocalTodayString,
+  getClientDisplayName
 } from '../utils';
 
 interface DashboardProps {
@@ -58,6 +59,7 @@ interface DashboardProps {
   agendaEvents: AgendaEvent[];
   onOpenNewEvent: () => void;
   onEditEvent: (event: AgendaEvent) => void;
+  onOpenEventsManager: () => void;
 }
 
 export default function Dashboard({
@@ -75,6 +77,7 @@ export default function Dashboard({
   agendaEvents = [],
   onOpenNewEvent,
   onEditEvent,
+  onOpenEventsManager,
 }: DashboardProps) {
   // UI Panels State
   const [isConfirmingId, setIsConfirmingId] = useState<string | null>(null);
@@ -305,16 +308,16 @@ export default function Dashboard({
       
       {/* 1. TOP STATS BAR & QUICK DATE SWIPER */}
       <div className="bg-white border-b border-slate-200 shrink-0 shadow-sm">
-        <div className="max-w-4xl mx-auto w-full px-4 py-3 space-y-3">
+        <div className="max-w-4xl mx-auto w-full px-3 sm:px-4 py-2 space-y-2">
           
           {/* Header Greeting & Real-time Info */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+              <h1 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-1.5">
                 roteiroelismar
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Modo Offline Ativo"></span>
               </h1>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Distribuição Pet & Ração</p>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Distribuição Pet & Ração</p>
             </div>
 
             {/* Quick date shortcuts */}
@@ -358,6 +361,7 @@ export default function Dashboard({
               <input
                 id="agenda_date_picker"
                 type="date"
+                inputMode="numeric"
                 value={selectedDate}
                 onChange={(e) => onSetSelectedDate(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-600 focus:outline-none px-2 py-1 cursor-pointer"
@@ -366,8 +370,8 @@ export default function Dashboard({
           </div>
 
           {/* Progress and Route Metrics Summary Card */}
-          <div className="bg-slate-900 rounded-xl p-4 text-white flex items-center justify-between gap-4 shadow-sm relative overflow-hidden">
-            <div className="space-y-1.5 z-10 flex-1">
+          <div className="bg-slate-900 rounded-xl p-3 text-white flex items-center justify-between gap-3 shadow-sm relative overflow-hidden">
+            <div className="space-y-1 z-10 flex-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Desempenho da Rota</p>
               <h2 className="text-sm font-extrabold flex items-center gap-2">
                 <CheckCircle className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
@@ -399,39 +403,23 @@ export default function Dashboard({
             <span className="text-xs font-bold text-slate-500">
               {formatFriendlyDate(selectedDate)}
             </span>
-            <div className="relative">
+              <div className="flex items-center gap-2">
+              <button
+                id="open_events_manager"
+                onClick={onOpenEventsManager}
+                className="flex items-center gap-1.5 min-h-[44px] text-xs font-bold bg-slate-900 border border-slate-800 hover:bg-slate-800 text-white px-3 rounded-xl transition-all shadow-sm cursor-pointer"
+              >
+                <Calendar className="w-4 h-4 text-amber-500" />
+                <span>Eventos/Compromissos</span>
+              </button>
               <button
                 id="open_new_launch_menu"
-                onClick={() => setShowLaunchMenu(!showLaunchMenu)}
-                className="flex items-center gap-1 text-xs font-black bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-xl transition-all shadow-sm"
+                onClick={() => setIsAddingExtra(true)}
+                className="flex items-center gap-1 min-h-[44px] text-xs font-black bg-blue-600 text-white hover:bg-blue-700 px-3 rounded-xl transition-all shadow-sm cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Novo lançamento</span>
+                <span>Visita Extra</span>
               </button>
-              {showLaunchMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 transition-all">
-                  <button
-                    onClick={() => {
-                      setIsAddingExtra(true);
-                      setShowLaunchMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4 text-blue-500" />
-                    Visita Extra
-                  </button>
-                  <button
-                    onClick={() => {
-                      onOpenNewEvent();
-                      setShowLaunchMenu(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                  >
-                    <Calendar className="w-4 h-4 text-purple-500" />
-                    Evento
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 
@@ -439,7 +427,7 @@ export default function Dashboard({
       </div>
 
       {/* 2. MAIN VISITS & EVENTS FEED */}
-      <div className="flex-1 overflow-y-auto max-w-4xl mx-auto w-full px-4 py-4 space-y-3.5 pb-24">
+      <div className="flex-1 overflow-y-auto max-w-4xl mx-auto w-full px-3 sm:px-4 py-3 space-y-3 pb-24">
         {(() => {
           const selectedEvents = agendaEvents.filter(e => e.date === selectedDate);
           const hasContent = dailyVisits.length > 0 || selectedEvents.length > 0;
@@ -471,10 +459,10 @@ export default function Dashboard({
           }
 
           return (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Daily Visits Section */}
               {dailyVisits.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 px-1">Roteiro de Visitas</h4>
                   {dailyVisits.map((visit, index) => {
                     const client = clients.find(c => c.id === visit.clientId);
@@ -487,7 +475,7 @@ export default function Dashboard({
                       <div
                         id={`visit_card_${visit.id}`}
                         key={visit.id}
-                        className={`bg-white rounded-xl border p-4 shadow-xs hover:shadow-md transition-all space-y-3.5 relative ${
+                        className={`bg-white rounded-xl border p-3 shadow-xs hover:shadow-md transition-all space-y-2.5 relative ${
                           visit.isExtra
                             ? 'border-blue-300 bg-blue-50/10 border-l-4 border-l-blue-500'
                             : isCompleted 
@@ -532,36 +520,16 @@ export default function Dashboard({
 
                           <div className="flex items-center gap-1 shrink-0">
                             {client && (
-                              <>
-                                <a
-                                  id={`whatsapp_visit_${visit.id}`}
-                                  href={getWhatsAppUrl(client.phone, `Olá ${client.buyerName}, sou o Elismar. Estou a caminho para nossa visita de hoje!`)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-100 transition-colors"
-                                  title="Enviar mensagem a caminho"
-                                >
-                                  <MessageCircle className="w-4 h-4" />
-                                </a>
-                                <a
-                                  href={getWazeUrl(visit.address)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-2 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors"
-                                  title="Navegar com Waze"
-                                >
-                                  <Navigation className="w-4 h-4" />
-                                </a>
-                                <a
-                                  href={getGoogleMapsUrl(visit.address)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-2 bg-slate-100 text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors"
-                                  title="Navegar com Google Maps"
-                                >
-                                  <MapPin className="w-4 h-4" />
-                                </a>
-                              </>
+                              <a
+                                id={`whatsapp_visit_${visit.id}`}
+                                href={getWhatsAppUrl(client.phone, `Olá ${client.buyerName}, sou o Elismar. Estou a caminho para nossa visita de hoje!`)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg hover:bg-emerald-100 transition-colors"
+                                title="Enviar mensagem a caminho"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </a>
                             )}
                             {visit.isExtra && (
                               <button
@@ -583,7 +551,7 @@ export default function Dashboard({
                         <div 
                           id={`visit_last_neg_${visit.id}`}
                           onClick={() => setSelectedClientHistoryId(visit.clientId)}
-                          className="bg-blue-50/50 hover:bg-blue-50 border-l-2 border-blue-400 p-2.5 rounded-r-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs transition-colors cursor-pointer"
+                          className="bg-blue-50/50 hover:bg-blue-50 border-l-2 border-blue-400 p-2 rounded-r-lg flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs transition-colors cursor-pointer"
                           title="Clique para ver todo o histórico"
                         >
                           <div className="text-slate-700 leading-relaxed max-w-xl">
@@ -917,6 +885,7 @@ export default function Dashboard({
                 <input
                   id="form_reschedule_date"
                   type="date"
+                  inputMode="numeric"
                   required
                   value={rescheduleDate}
                   onChange={(e) => setRescheduleDate(e.target.value)}
@@ -1008,7 +977,7 @@ export default function Dashboard({
                     <div key={client.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h4 className="font-bold text-slate-800 text-xs truncate">{client.name}</h4>
+                          <h4 className="font-bold text-slate-800 text-xs truncate">{getClientDisplayName(client)}</h4>
                           {distance !== null && (
                             <span className="bg-blue-50 border border-blue-100 text-blue-700 text-[9px] px-1.5 py-0.5 rounded font-mono font-bold shrink-0">
                               A {distance} km

@@ -1,0 +1,31 @@
+# App Engine Configuration – Custo mínimo (F1 Free Tier)
+# ATENÇÃO: Este backend Express existe no código mas NÃO é usado pelo frontend atual.
+# O frontend usa Firestore diretamente via SDK Firebase.
+# Este arquivo existe APENAS como contingência caso o App Engine seja reativado.
+#
+# Para EVITAR custos: mantenha o App Engine PARADO no console:
+# https://console.cloud.google.com/appengine/versions?project=roteiroelismar
+
+runtime: nodejs20
+
+# Instância F1 = menor disponível, inclusa no Free Tier do Google Cloud
+# (28 horas de instância/dia gratuitas)
+instance_class: F1
+
+automatic_scaling:
+  # Não mantenha instâncias ligadas sem tráfego real
+  min_instances: 0
+  max_instances: 1
+  # Aguarda 5s de backlog antes de criar nova instância
+  min_pending_latency: 5s
+  # Derruba instâncias ociosas rapidamente (60s)
+  max_idle_instances: 1
+  target_cpu_utilization: 0.6
+
+env_variables:
+  NODE_ENV: "production"
+  MAX_AI_CALLS_PER_USER_HOUR: "5"
+  MAX_AI_CALLS_PER_USER_DAY: "15"
+  MAX_CONCURRENT_AI_CALLS: "1"
+  MAX_AI_CALLS_PER_IP_HOUR: "30"
+  ENFORCE_APP_CHECK: "true"

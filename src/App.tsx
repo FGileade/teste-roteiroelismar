@@ -4,22 +4,23 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Client, Visit, NegotiationHistory, WeekDay, RouteFrequency, VoiceNote, AgendaEvent } from './types';
+import { Client, Visit, NegotiationHistory, WeekDay, RouteFrequency, VoiceNote, AgendaEvent, ProductLoan } from './types';
 
-import { INITIAL_CLIENTS, INITIAL_NEGOTIATIONS, getDayNameFromDate } from './data/initialData';
+import { getDayNameFromDate } from './data/initialData';
 import Dashboard from './components/Dashboard';
 import ClientManagement from './components/ClientManagement';
-import RoutePlanner from './components/RoutePlanner';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import BottomNavBar from './components/BottomNavBar';
 import VoiceNotesModal from './components/VoiceNotesModal';
-import { getLocalTodayString } from './utils';
+import { getLocalTodayString, getClientDisplayName } from './utils';
 import VersiculoBanner from './components/VersiculoBanner';
 import EventModal from './components/EventModal';
 import { requestNotificationPermission, scheduleEventNotification } from './components/EventModal';
+import EventsManagerModal from './components/EventsManagerModal';
+import { ExcelImportReport } from './lib/excelService';
 
-import { Compass, Wifi, Cloud, CloudOff } from 'lucide-react';
+import { Compass, Wifi, Cloud, CloudOff, AlertCircle } from 'lucide-react';
 import { auth, signOut } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -27,10 +28,12 @@ import {
   downloadUserData,
   uploadAllUserData,
   uploadCollection,
-  saveInitializedDatesToCloud
+  saveInitializedDatesToCloud,
+  resolveUserId
 } from './lib/firebaseSync';
+import { addToQueue, processQueue } from './lib/syncQueue';
 
-type TabType = 'agenda' | 'clientes' | 'rotas' | 'configuracoes';
+type TabType = 'agenda' | 'clientes' | 'emprestimos' | 'configuracoes';
 
 // Safe helper to calculate bi-weekly week offset (0 or 1) based on standard ISO week
 const getWeekOffsetForDate = (dateStr: string): 0 | 1 => {
@@ -65,7 +68,9 @@ const syncVisitsWithClients = (
         return c.weekOffset === currentWeekOffset;
       }
       if (c.frequency === 'monthly') {
-        return currentWeekOffset === 0;
+        const monthWeek = c.monthWeek || 1;
+        const dateMonthWeek = Math.ceil(d.getDate() / 7);
+        return dateMonthWeek === monthWeek;
       }
       return false;
     });
@@ -78,7 +83,7 @@ const syncVisitsWithClients = (
         updatedVisits.push({
           id: `v_${dateStr}_${client.id}`,
           clientId: client.id,
-          clientName: client.name,
+          clientName: getClientDisplayName(client),
           address: client.address,
           date: dateStr,
           status: 'pending',
@@ -90,7 +95,7 @@ const syncVisitsWithClients = (
           if (v.clientId === client.id && v.date === dateStr && v.status === 'pending') {
             return {
               ...v,
-              clientName: client.name,
+              clientName: getClientDisplayName(client),
               address: client.address
             };
           }
@@ -136,7 +141,10 @@ export default function App() {
   const [isVoiceNotesModalOpen, setIsVoiceNotesModalOpen] = useState(false);
   const [agendaEvents, setAgendaEvents] = useState<AgendaEvent[]>([]);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [isEventsManagerOpen, setIsEventsManagerOpen] = useState(false);
+  const [shouldReopenManager, setShouldReopenManager] = useState(false);
   const [editingEvent, setEditingEvent] = useState<AgendaEvent | null>(null);
+  const [loans, setLoans] = useState<ProductLoan[]>([]);
 
   const [initializedDates, setInitializedDates] = useState<string[]>(() => {
     const stored = localStorage.getItem('roteiro_pet_initialized_dates');
@@ -154,11 +162,13 @@ export default function App() {
     return [];
   });
 
-  // Cloud Sync Status States
+  const [isSyncingWithCloud, setIsSyncingWithCloud] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [isSyncingWithCloud, setIsSyncingWithCloud] = useState<boolean>(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
 
   const syncDataFromCloud = async (userId: string) => {
+    setSyncError(null);
     setIsSyncingWithCloud(true);
     try {
       const hasCloud = await hasCloudData(userId);
@@ -171,12 +181,14 @@ export default function App() {
         const storedVoiceNotes = localStorage.getItem('roteiro_pet_voice_notes');
         const storedEvents = localStorage.getItem('roteiro_pet_events');
         const storedDates = localStorage.getItem('roteiro_pet_initialized_dates');
+        const storedLoans = localStorage.getItem('roteiro_pet_loans');
 
-        const localClients = storedClients ? JSON.parse(storedClients) : INITIAL_CLIENTS;
+        const localClients = storedClients ? JSON.parse(storedClients) : [];
         const localVisits = storedVisits ? JSON.parse(storedVisits) : [];
-        const localNegs = storedNegs ? JSON.parse(storedNegs) : INITIAL_NEGOTIATIONS;
+        const localNegs = storedNegs ? JSON.parse(storedNegs) : [];
         const localVoiceNotes = storedVoiceNotes ? JSON.parse(storedVoiceNotes) : [];
         const localEvents = storedEvents ? JSON.parse(storedEvents) : [];
+        const localLoans = storedLoans ? JSON.parse(storedLoans) : [];
         const localDates = storedDates ? JSON.parse(storedDates) : [];
 
         await uploadAllUserData(userId, {
@@ -185,6 +197,7 @@ export default function App() {
           negotiations: localNegs,
           voiceNotes: localVoiceNotes,
           agendaEvents: localEvents,
+          loans: localLoans,
           initializedDates: localDates
         });
 
@@ -193,6 +206,7 @@ export default function App() {
         setNegotiations(localNegs);
         setVoiceNotes(localVoiceNotes);
         setAgendaEvents(localEvents);
+        setLoans(localLoans);
         setInitializedDates(localDates);
       } else {
         console.log('Found cloud data. Downloading to local state...');
@@ -203,6 +217,7 @@ export default function App() {
         setNegotiations(cloud.negotiations);
         setVoiceNotes(cloud.voiceNotes);
         setAgendaEvents(cloud.agendaEvents || []);
+        setLoans(cloud.loans || []);
         setInitializedDates(cloud.initializedDates);
 
         localStorage.setItem('roteiro_pet_clients', JSON.stringify(cloud.clients));
@@ -210,16 +225,17 @@ export default function App() {
         localStorage.setItem('roteiro_pet_negotiations', JSON.stringify(cloud.negotiations));
         localStorage.setItem('roteiro_pet_voice_notes', JSON.stringify(cloud.voiceNotes));
         localStorage.setItem('roteiro_pet_events', JSON.stringify(cloud.agendaEvents || []));
+        localStorage.setItem('roteiro_pet_loans', JSON.stringify(cloud.loans || []));
         localStorage.setItem('roteiro_pet_initialized_dates', JSON.stringify(cloud.initializedDates));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error syncing with cloud:', e);
+      setSyncError(e.message || 'Erro de conexão/permissão ao sincronizar com Firestore.');
     } finally {
       setIsSyncingWithCloud(false);
     }
   };
 
-  // Listen to Firebase auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user && user.email) {
@@ -237,7 +253,7 @@ export default function App() {
         
         // Let state hydrate from localStorage first, then sync up/down
         setTimeout(() => {
-          syncDataFromCloud(user.uid);
+          syncDataFromCloud(resolveUserId(user.uid));
         }, 150);
 
       } else {
@@ -247,6 +263,47 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Apply Screen Orientation preference
+  useEffect(() => {
+    const allowRotation = localStorage.getItem('roteiro_pet_allow_rotation') !== 'false';
+    try {
+      if (!allowRotation) {
+        if (screen.orientation && typeof (screen.orientation as any).lock === 'function') {
+          (screen.orientation as any).lock('portrait').catch((err: any) => {
+            console.warn('Orientation lock failed on init:', err);
+          });
+        }
+      } else {
+        if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+          screen.orientation.unlock();
+        }
+      }
+    } catch (e) {
+      console.warn('Screen orientation API not fully supported on init:', e);
+    }
+  }, []);
+
+  // Resume offline sync when network connection is recovered
+  useEffect(() => {
+    const handleOnline = () => {
+      if (currentUser) {
+        setIsSyncingWithCloud(true);
+        processQueue(resolveUserId(currentUser.uid), (status) => {
+          if (status === 'syncing') {
+            setIsSyncingWithCloud(true);
+          } else {
+            setIsSyncingWithCloud(false);
+            if (status === 'failed') {
+              setWriteError("Algumas alterações pendentes falharam ao sincronizar.");
+            }
+          }
+        });
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [currentUser]);
+
   // 1. Initial State Hydration from localStorage or Seeds
   useEffect(() => {
     const storedClients = localStorage.getItem('roteiro_pet_clients');
@@ -255,39 +312,15 @@ export default function App() {
     const storedVoiceNotes = localStorage.getItem('roteiro_pet_voice_notes');
 
     if (storedClients) {
-      const parsed = JSON.parse(storedClients);
-      // Automatically migrate to the new Cariacica dataset if previous mock items or capitals exist
-      const hasOldCapitals = parsed.some((c: any) => 
-        c.id === 'c1' || 
-        c.id === 'c2' || 
-        c.id === 'c3' ||
-        c.city === 'Vitória' || 
-        c.city === 'Vila Velha' || 
-        c.city === 'São Paulo' || 
-        c.address.includes('São Paulo') || 
-        c.address.includes('Vitória') || 
-        c.address.includes('Vila Velha')
-      );
-      if (hasOldCapitals) {
-        setClients(INITIAL_CLIENTS);
-        localStorage.setItem('roteiro_pet_clients', JSON.stringify(INITIAL_CLIENTS));
-        setNegotiations(INITIAL_NEGOTIATIONS);
-        localStorage.setItem('roteiro_pet_negotiations', JSON.stringify(INITIAL_NEGOTIATIONS));
-        setVisits([]);
-        localStorage.removeItem('roteiro_pet_visits');
-      } else {
-        setClients(parsed);
-      }
+      setClients(JSON.parse(storedClients));
     } else {
-      setClients(INITIAL_CLIENTS);
-      localStorage.setItem('roteiro_pet_clients', JSON.stringify(INITIAL_CLIENTS));
+      setClients([]);
     }
 
     if (storedNegotiations) {
       setNegotiations(JSON.parse(storedNegotiations));
     } else {
-      setNegotiations(INITIAL_NEGOTIATIONS);
-      localStorage.setItem('roteiro_pet_negotiations', JSON.stringify(INITIAL_NEGOTIATIONS));
+      setNegotiations([]);
     }
 
     if (storedVisits) {
@@ -310,19 +343,78 @@ export default function App() {
       // Re-schedule pending notifications
       parsed.forEach(ev => scheduleEventNotification(ev));
     }
+
+    // Load loans from localStorage
+    const storedLoans = localStorage.getItem('roteiro_pet_loans');
+    if (storedLoans) {
+      setLoans(JSON.parse(storedLoans));
+    } else {
+      setLoans([]);
+    }
   }, []);
 
 
   // 2. State-to-Storage Sync Hooks
+  const syncWithCloud = async <T extends { id: string }>(
+    collectionName: string,
+    oldItems: T[],
+    newItems: T[]
+  ) => {
+    if (!currentUser) return;
+    try {
+      setWriteError(null);
+      const userId = resolveUserId(currentUser.uid);
+
+      const oldMap = new Map(oldItems.map(item => [item.id, item]));
+      const newMap = new Map(newItems.map(item => [item.id, item]));
+
+      // Queue new/updated items
+      for (const item of newItems) {
+        const oldItem = oldMap.get(item.id);
+        if (!oldItem || JSON.stringify(oldItem) !== JSON.stringify(item)) {
+          addToQueue(userId, collectionName as any, item.id, 'set', item);
+        }
+      }
+
+      // Queue deleted items
+      for (const item of oldItems) {
+        if (!newMap.has(item.id)) {
+          addToQueue(userId, collectionName as any, item.id, 'delete', null);
+        }
+      }
+
+      // Process the queue
+      setIsSyncingWithCloud(true);
+      await processQueue(userId, (status) => {
+        if (status === 'syncing') {
+          setIsSyncingWithCloud(true);
+        } else {
+          setIsSyncingWithCloud(false);
+          if (status.startsWith('failed')) {
+            const detail = status.startsWith('failed:') ? status.slice(7) : '';
+            setWriteError(`Falha ao sincronizar ${collectionName}${detail ? `: ${detail}` : '.'}`);
+          }
+        }
+      });
+    } catch (err: any) {
+      console.error(err);
+      setWriteError(`Erro ao sincronizar ${collectionName} com a nuvem.`);
+      setIsSyncingWithCloud(false);
+    }
+  };
+
   const saveClientsAndVisitsToStorage = (updatedClients: Client[], updatedVisits: Visit[]) => {
+    const oldClients = [...clients];
+    const oldVisits = [...visits];
+
     setClients(updatedClients);
     localStorage.setItem('roteiro_pet_clients', JSON.stringify(updatedClients));
     setVisits(updatedVisits);
     localStorage.setItem('roteiro_pet_visits', JSON.stringify(updatedVisits));
 
     if (currentUser) {
-      uploadCollection(currentUser.uid, 'clients', updatedClients).catch(console.error);
-      uploadCollection(currentUser.uid, 'visits', updatedVisits).catch(console.error);
+      syncWithCloud('clients', oldClients, updatedClients);
+      syncWithCloud('visits', oldVisits, updatedVisits);
     }
   };
 
@@ -332,37 +424,50 @@ export default function App() {
   };
 
   const saveNegotiationsToStorage = (updatedNegs: NegotiationHistory[]) => {
+    const oldNegs = [...negotiations];
     setNegotiations(updatedNegs);
     localStorage.setItem('roteiro_pet_negotiations', JSON.stringify(updatedNegs));
 
     if (currentUser) {
-      uploadCollection(currentUser.uid, 'negotiations', updatedNegs).catch(console.error);
+      syncWithCloud('negotiations', oldNegs, updatedNegs);
     }
   };
 
   const saveVisitsToStorage = (updatedVisits: Visit[]) => {
+    const oldVisits = [...visits];
     setVisits(updatedVisits);
     localStorage.setItem('roteiro_pet_visits', JSON.stringify(updatedVisits));
 
     if (currentUser) {
-      uploadCollection(currentUser.uid, 'visits', updatedVisits).catch(console.error);
+      syncWithCloud('visits', oldVisits, updatedVisits);
     }
   };
 
   const saveVoiceNotesToStorage = (updatedNotes: VoiceNote[]) => {
+    const oldNotes = [...voiceNotes];
     setVoiceNotes(updatedNotes);
     localStorage.setItem('roteiro_pet_voice_notes', JSON.stringify(updatedNotes));
 
     if (currentUser) {
-      uploadCollection(currentUser.uid, 'voiceNotes', updatedNotes).catch(console.error);
+      syncWithCloud('voiceNotes', oldNotes, updatedNotes);
     }
   };
 
   const saveEventsToStorage = (updatedEvents: AgendaEvent[]) => {
+    const oldEvents = [...agendaEvents];
     setAgendaEvents(updatedEvents);
     localStorage.setItem('roteiro_pet_events', JSON.stringify(updatedEvents));
     if (currentUser) {
-      uploadCollection(currentUser.uid, 'events', updatedEvents).catch(console.error);
+      syncWithCloud('events', oldEvents, updatedEvents);
+    }
+  };
+
+  const saveLoansToStorage = (updatedLoans: ProductLoan[]) => {
+    const oldLoans = [...loans];
+    setLoans(updatedLoans);
+    localStorage.setItem('roteiro_pet_loans', JSON.stringify(updatedLoans));
+    if (currentUser) {
+      syncWithCloud('loans', oldLoans, updatedLoans);
     }
   };
 
@@ -372,24 +477,111 @@ export default function App() {
     if (exists) {
       updated = agendaEvents.map(e => e.id === event.id ? event : e);
     } else {
-      updated = [event, ...agendaEvents];
-    }
-    // If event has a client, add to that client's negotiation history
-    if (event.clientId && !exists) {
-      const newNeg: NegotiationHistory = {
-        id: `n_ev_${event.id}`,
-        clientId: event.clientId,
-        date: event.date,
-        notes: `[Evento] ${event.title}${event.notes ? ': ' + event.notes : ''}`,
-        value: 0,
-      };
-      saveNegotiationsToStorage([newNeg, ...negotiations]);
+      // For new events, set status to 'agendado' by default if not set
+      const newEvent = { ...event, status: event.status || 'agendado' };
+      updated = [newEvent, ...agendaEvents];
     }
     saveEventsToStorage(updated);
   };
 
   const handleDeleteEvent = (eventId: string) => {
     const updated = agendaEvents.filter(e => e.id !== eventId);
+    saveEventsToStorage(updated);
+  };
+
+
+
+  const handleAddLoan = (newLoan: ProductLoan) => {
+    const updatedLoans = [...loans, newLoan];
+    saveLoansToStorage(updatedLoans);
+
+    // Also add to Negotiation History for both origin and destination clients
+    const originNeg: NegotiationHistory = {
+      id: `neg_loan_orig_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      clientId: newLoan.originClientId,
+      date: newLoan.date,
+      notes: `[Empréstimo Cedido] Ração/Produto: ${newLoan.productName}, Qtd: ${newLoan.quantity}. Destinatário: ${newLoan.destClientName}. Obs: ${newLoan.notes || ''}`,
+      value: 0
+    };
+
+    const destNeg: NegotiationHistory = {
+      id: `neg_loan_dest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      clientId: newLoan.destClientId,
+      date: newLoan.date,
+      notes: `[Empréstimo Recebido] Ração/Produto: ${newLoan.productName}, Qtd: ${newLoan.quantity}. Remetente: ${newLoan.originClientName}. Obs: ${newLoan.notes || ''}`,
+      value: 0
+    };
+
+    const updatedNegs = [...negotiations, originNeg, destNeg];
+    saveNegotiationsToStorage(updatedNegs);
+  };
+
+  const handleUpdateLoan = (updatedLoan: ProductLoan) => {
+    // Check if the loan was returned in this update (if state transition is pending -> resolved)
+    const oldLoan = loans.find(l => l.id === updatedLoan.id);
+    const becameResolved = oldLoan && oldLoan.status === 'pending' && updatedLoan.status === 'resolved';
+
+    const updatedLoans = loans.map(l => l.id === updatedLoan.id ? updatedLoan : l);
+    saveLoansToStorage(updatedLoans);
+
+    if (becameResolved) {
+      // Add a return history note to both clients
+      const retDate = updatedLoan.returnDate || getLocalTodayString();
+      const originNeg: NegotiationHistory = {
+        id: `neg_loan_ret_orig_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        clientId: updatedLoan.originClientId,
+        date: retDate,
+        notes: `[Empréstimo Devolvido/Acertado] Ração/Produto: ${updatedLoan.productName}, Qtd: ${updatedLoan.quantity}. Destinatário: ${updatedLoan.destClientName}. Obs Devolução: ${updatedLoan.returnNotes || ''}`,
+        value: 0
+      };
+
+      const destNeg: NegotiationHistory = {
+        id: `neg_loan_ret_dest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        clientId: updatedLoan.destClientId,
+        date: retDate,
+        notes: `[Empréstimo Devolvido/Acertado] Ração/Produto: ${updatedLoan.productName}, Qtd: ${updatedLoan.quantity}. Remetente: ${updatedLoan.originClientName}. Obs Devolução: ${updatedLoan.returnNotes || ''}`,
+        value: 0
+      };
+
+      const updatedNegs = [...negotiations, originNeg, destNeg];
+      saveNegotiationsToStorage(updatedNegs);
+    }
+  };
+
+  const handleDeleteLoan = (loanId: string) => {
+    const updatedLoans = loans.filter(l => l.id !== loanId);
+    saveLoansToStorage(updatedLoans);
+  };
+
+  const handleConfirmEvent = (eventId: string, notes?: string) => {
+    const updated = agendaEvents.map(ev => {
+      if (ev.id === eventId) {
+        const updatedEv = { ...ev, status: 'concluido' as const, notes: notes || ev.notes };
+        // If event has a client linked, record to negotiations history
+        if (ev.clientId) {
+          const newNeg: NegotiationHistory = {
+            id: `n_ev_done_${Date.now()}`,
+            clientId: ev.clientId,
+            date: ev.date,
+            notes: `[Evento Concluído] ${ev.title}. Obs: ${notes || 'Sem observações'}`,
+            value: 0
+          };
+          saveNegotiationsToStorage([newNeg, ...negotiations]);
+        }
+        return updatedEv;
+      }
+      return ev;
+    });
+    saveEventsToStorage(updated);
+  };
+
+  const handleCancelEvent = (eventId: string) => {
+    const updated = agendaEvents.map(ev => {
+      if (ev.id === eventId) {
+        return { ...ev, status: 'cancelado' as const };
+      }
+      return ev;
+    });
     saveEventsToStorage(updated);
   };
 
@@ -464,8 +656,9 @@ export default function App() {
         }
 
         if (c.frequency === 'monthly') {
-          // For simple demo, monthly clients are visited on the 1st week of month (offset 0)
-          return currentWeekOffset === 0;
+          const monthWeek = c.monthWeek || 1;
+          const dateMonthWeek = Math.ceil(date.getDate() / 7);
+          return dateMonthWeek === monthWeek;
         }
 
         return false;
@@ -478,7 +671,7 @@ export default function App() {
       const newVisits: Visit[] = sortedScheduled.map((c, idx) => ({
         id: `v_${selectedDate}_${c.id}`,
         clientId: c.id,
-        clientName: c.name,
+        clientName: getClientDisplayName(c),
         address: c.address,
         date: selectedDate,
         status: 'pending',
@@ -492,14 +685,19 @@ export default function App() {
       );
 
       const mergedVisits = [...visits, ...uniqueNewVisits];
-      saveVisitsToStorage(mergedVisits);
+      if (uniqueNewVisits.length > 0) {
+        saveVisitsToStorage(mergedVisits);
+      }
 
       if (!initializedDates.includes(selectedDate)) {
         const updatedInitDates = [...initializedDates, selectedDate];
         setInitializedDates(updatedInitDates);
         localStorage.setItem('roteiro_pet_initialized_dates', JSON.stringify(updatedInitDates));
-        if (currentUser) {
-          saveInitializedDatesToCloud(currentUser.uid, updatedInitDates).catch(console.error);
+        if (currentUser && !isSyncingWithCloud) {
+          saveInitializedDatesToCloud(resolveUserId(currentUser.uid), updatedInitDates).catch(err => {
+            console.error(err);
+            setWriteError('Erro ao sincronizar datas inicializadas.');
+          });
         }
       }
     }
@@ -562,7 +760,7 @@ export default function App() {
       if (v.clientId === updatedClient.id) {
         return {
           ...v,
-          clientName: updatedClient.name,
+          clientName: getClientDisplayName(updatedClient),
           address: updatedClient.address
         };
       }
@@ -576,6 +774,10 @@ export default function App() {
     saveClientsAndVisitsToStorage(updated, syncedVisits);
   };
 
+  const handleImportClients = (report: ExcelImportReport) => {
+    saveClientsToStorage(report.clients);
+  };
+
   const handleDeleteClient = (clientId: string) => {
     const updated = clients.filter(c => c.id !== clientId);
     // Filter out related pending visits
@@ -586,38 +788,6 @@ export default function App() {
     
     // Save both Atomically
     saveClientsAndVisitsToStorage(updated, syncedVisits);
-  };
-
-  const handleUpdateClientRoute = (
-    clientId: string,
-    weekday: WeekDay | undefined,
-    frequency: RouteFrequency,
-    order: number
-  ) => {
-    const client = clients.find(c => c.id === clientId);
-    if (!client) return;
-
-    const updatedClient: Client = {
-      ...client,
-      weekday,
-      frequency,
-      routeOrder: order
-    };
-
-    handleUpdateClient(updatedClient);
-  };
-
-  const handleReorderRoute = (weekday: WeekDay, reorderedClients: Client[]) => {
-    const updated = clients.map(c => {
-      if (c.weekday === weekday) {
-        const matching = reorderedClients.find(rc => rc.id === c.id);
-        if (matching) {
-          return { ...c, routeOrder: matching.routeOrder };
-        }
-      }
-      return c;
-    });
-    saveClientsToStorage(updated);
   };
 
   // --- Handlers for Visits ---
@@ -759,7 +929,7 @@ export default function App() {
     const extraVisit: Visit = {
       id: `v_extra_${Date.now()}_${clientId}`,
       clientId: client.id,
-      clientName: client.name,
+      clientName: getClientDisplayName(client),
       address: client.address,
       date: selectedDate,
       status: 'pending',
@@ -787,7 +957,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen text-slate-800 bg-slate-50 antialiased overflow-hidden">
+    <div className="app-shell flex flex-col h-screen text-slate-800 bg-slate-50 antialiased overflow-hidden">
       
       {/* Offline & Cloud Status indicator tag */}
       <div className="bg-indigo-950 text-indigo-100 px-4 py-2 flex items-center justify-between text-[11px] font-semibold shrink-0 border-b border-indigo-900 shadow-sm">
@@ -796,6 +966,24 @@ export default function App() {
           <span>Banco Local Ativo (Offline-First)</span>
         </div>
         <div className="flex items-center gap-2">
+          {localStorage.getItem('roteiro_pet_offline_mode') === 'true' && (
+            <div className="flex items-center gap-1.5 text-rose-400 font-bold animate-pulse mr-2" title="Você entrou em modo offline. O aplicativo não sincroniza com o banco na nuvem.">
+              <CloudOff className="w-3.5 h-3.5" />
+              <span>Modo Offline (Não Sincronizado)</span>
+            </div>
+          )}
+          {syncError && (
+            <div className="flex items-center gap-1.5 text-rose-400 mr-2" title={syncError}>
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>Erro de Sincronismo</span>
+            </div>
+          )}
+          {writeError && (
+            <div className="flex items-center gap-1.5 text-amber-400 mr-2" title={writeError}>
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>Erro de Gravação</span>
+            </div>
+          )}
           {currentUser ? (
             isSyncingWithCloud ? (
               <div className="flex items-center gap-1.5 text-blue-300">
@@ -805,17 +993,19 @@ export default function App() {
             ) : (
               <div className="flex items-center gap-1.5 text-emerald-400">
                 <Cloud className="w-3.5 h-3.5" />
-                <span>Nuvem Conectada e Sincronizada ({currentUser.email})</span>
+                <span>Nuvem Conectada ({currentUser.email})</span>
               </div>
             )
           ) : (
-            <div className="flex items-center gap-1.5 text-amber-400" title="Suas alterações estão salvas no navegador. Faça login para backup na nuvem.">
-              <CloudOff className="w-3.5 h-3.5" />
-              <span>Modo Local • Sem Backup na Nuvem</span>
-            </div>
+            localStorage.getItem('roteiro_pet_offline_mode') !== 'true' && (
+              <div className="flex items-center gap-1.5 text-amber-400" title="Suas alterações estão salvas no navegador. Faça login para backup na nuvem.">
+                <CloudOff className="w-3.5 h-3.5" />
+                <span>Modo Local • Sem Backup na Nuvem</span>
+              </div>
+            )
           )}
           <span className="h-3 w-[1px] bg-indigo-800 mx-1"></span>
-          <span className="opacity-75 font-mono text-[10px]">v1.5.0</span>
+          <span className="opacity-75 font-mono text-[10px]">v1.7</span>
         </div>
       </div>
 
@@ -837,105 +1027,38 @@ export default function App() {
             agendaEvents={agendaEvents}
             onOpenNewEvent={() => { setEditingEvent(null); setIsEventModalOpen(true); }}
             onEditEvent={(ev) => { setEditingEvent(ev); setIsEventModalOpen(true); }}
+            onOpenEventsManager={() => setIsEventsManagerOpen(true)}
           />
 
         )}
 
-        {currentTab === 'clientes' && (
+        {(currentTab === 'clientes' || currentTab === 'emprestimos') && (
           <ClientManagement
             clients={clients}
             negotiations={negotiations}
+            loans={loans}
             onAddClient={handleAddClient}
             onUpdateClient={handleUpdateClient}
             onDeleteClient={handleDeleteClient}
             onUpdateNegotiation={handleUpdateNegotiation}
             onDeleteNegotiation={handleDeleteNegotiation}
+            onAddLoan={handleAddLoan}
+            onUpdateLoan={handleUpdateLoan}
+            onDeleteLoan={handleDeleteLoan}
+            activeSubTab={currentTab === 'emprestimos' ? 'emprestimos' : 'carteira'}
+            onActiveSubTabChange={(tab) => {
+              setCurrentTab(tab === 'emprestimos' ? 'emprestimos' : 'clientes');
+            }}
           />
         )}
 
-        {currentTab === 'rotas' && (
-          <RoutePlanner
-            clients={clients}
-            visits={visits}
-            onUpdateClientRoute={handleUpdateClientRoute}
-            onReorderRoute={handleReorderRoute}
-            onAddVisitForDate={(clientId, dateStr) => {
-              const client = clients.find(c => c.id === clientId);
-              if (!client) return;
-              const extraVisit: Visit = {
-                id: `v_extra_${Date.now()}_${clientId}`,
-                clientId: client.id,
-                clientName: client.name,
-                address: client.address,
-                date: dateStr,
-                status: 'pending',
-                isExtra: true
-              };
-              const updated = [...visits, extraVisit];
-              saveVisitsToStorage(updated);
-            }}
-            onDeleteVisit={(visitId) => {
-              const updated = visits.filter(v => v.id !== visitId);
-              saveVisitsToStorage(updated);
-            }}
-            initializedDates={initializedDates}
-            onInitializeDates={(datesToInit) => {
-              let newInitDates = [...initializedDates];
-              let currentVisits = [...visits];
-              let changed = false;
-
-              datesToInit.forEach(dateStr => {
-                if (!newInitDates.includes(dateStr)) {
-                  const date = new Date(dateStr + 'T12:00:00');
-                  const weekday = getDayNameFromDate(date);
-                  const currentWeekOffset = getWeekOffsetForDate(dateStr);
-
-                  const scheduledClientsForDay = clients.filter(c => {
-                    if (c.weekday !== weekday) return false;
-                    if (c.frequency === 'weekly') return true;
-                    if (c.frequency === 'biweekly') return c.weekOffset === currentWeekOffset;
-                    if (c.frequency === 'monthly') return currentWeekOffset === 0;
-                    return false;
-                  });
-
-                  const sortedScheduled = scheduledClientsForDay.sort((a, b) => a.routeOrder - b.routeOrder);
-
-                  const newVisits: Visit[] = sortedScheduled.map(c => ({
-                    id: `v_${dateStr}_${c.id}`,
-                    clientId: c.id,
-                    clientName: c.name,
-                    address: c.address,
-                    date: dateStr,
-                    status: 'pending',
-                    isExtra: false
-                  }));
-
-                  const existingVisitsForDate = currentVisits.filter(v => v.date === dateStr);
-                  const uniqueNewVisits = newVisits.filter(
-                    nv => !existingVisitsForDate.some(ev => ev.clientId === nv.clientId)
-                  );
-
-                  currentVisits = [...currentVisits, ...uniqueNewVisits];
-                  newInitDates.push(dateStr);
-                  changed = true;
-                }
-              });
-
-              if (changed) {
-                saveVisitsToStorage(currentVisits);
-                setInitializedDates(newInitDates);
-                localStorage.setItem('roteiro_pet_initialized_dates', JSON.stringify(newInitDates));
-              }
-            }}
-            onConfirmVisit={handleConfirmVisit}
-            onCancelVisit={handleCancelVisit}
-            onRescheduleVisit={handleRescheduleVisit}
-          />
-        )}
 
         {currentTab === 'configuracoes' && (
           <Settings
+            clients={clients}
+            onImportClients={handleImportClients}
             userEmail={userEmail}
+            userId={currentUser ? resolveUserId(currentUser.uid) : 'local'}
             onUpdateEmail={(email) => setUserEmail(email)}
             onLogout={async () => {
               try {
@@ -943,7 +1066,28 @@ export default function App() {
               } catch (e) {
                 console.warn('Firebase signOut error:', e);
               }
-              localStorage.setItem('roteiro_pet_is_logged_in', 'false');
+              // Clear localStorage keys
+              localStorage.removeItem('roteiro_pet_is_logged_in');
+              localStorage.removeItem('roteiro_pet_user_email');
+              localStorage.removeItem('roteiro_pet_clients');
+              localStorage.removeItem('roteiro_pet_visits');
+              localStorage.removeItem('roteiro_pet_negotiations');
+              localStorage.removeItem('roteiro_pet_voice_notes');
+              localStorage.removeItem('roteiro_pet_events');
+              localStorage.removeItem('roteiro_pet_initialized_dates');
+              localStorage.removeItem('notif_permission_asked');
+              localStorage.removeItem('roteiro_pet_loans');
+              localStorage.removeItem('roteiro_pet_offline_mode');
+
+              // Reset React States
+              setClients([]);
+              setVisits([]);
+              setNegotiations([]);
+              setVoiceNotes([]);
+              setAgendaEvents([]);
+              setInitializedDates([]);
+              setLoans([]);
+              setCurrentUser(null);
               setIsLoggedIn(false);
             }}
           />
@@ -973,13 +1117,56 @@ export default function App() {
       {/* Event Modal */}
       <EventModal
         isOpen={isEventModalOpen}
-        onClose={() => setIsEventModalOpen(false)}
-        onSave={handleSaveEvent}
-        onDelete={handleDeleteEvent}
+        onClose={() => {
+          setIsEventModalOpen(false);
+          if (shouldReopenManager) {
+            setIsEventsManagerOpen(true);
+            setShouldReopenManager(false);
+          }
+        }}
+        onSave={(ev) => {
+          handleSaveEvent(ev);
+          setIsEventModalOpen(false);
+          if (shouldReopenManager) {
+            setIsEventsManagerOpen(true);
+            setShouldReopenManager(false);
+          }
+        }}
+        onDelete={(id) => {
+          handleDeleteEvent(id);
+          setIsEventModalOpen(false);
+          if (shouldReopenManager) {
+            setIsEventsManagerOpen(true);
+            setShouldReopenManager(false);
+          }
+        }}
         clients={clients}
         initialDate={selectedDate}
-        userId={currentUser?.uid || 'local'}
+        userId={currentUser ? resolveUserId(currentUser.uid) : 'local'}
         editingEvent={editingEvent}
+      />
+
+      {/* Events Manager Modal */}
+      <EventsManagerModal
+        isOpen={isEventsManagerOpen}
+        onClose={() => setIsEventsManagerOpen(false)}
+        agendaEvents={agendaEvents}
+        clients={clients}
+        onOpenNewEvent={() => { 
+          setEditingEvent(null); 
+          setShouldReopenManager(true);
+          setIsEventsManagerOpen(false);
+          setIsEventModalOpen(true); 
+        }}
+        onEditEvent={(ev) => { 
+          setEditingEvent(ev); 
+          setShouldReopenManager(true);
+          setIsEventsManagerOpen(false);
+          setIsEventModalOpen(true); 
+        }}
+        onDeleteEvent={handleDeleteEvent}
+        onConfirmEvent={handleConfirmEvent}
+        onCancelEvent={handleCancelEvent}
       />
 
       {/* Versículo do Dia Banner */}

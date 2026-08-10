@@ -4,10 +4,10 @@
  */
 
 import React from 'react';
-import { Calendar, Users, Map, Settings, Mic } from 'lucide-react';
+import { Calendar, Users, Map, Settings, Mic, ArrowRightLeft } from 'lucide-react';
 import { AppSignature } from './AppSignature';
 
-type TabType = 'agenda' | 'clientes' | 'rotas' | 'configuracoes';
+type TabType = 'agenda' | 'clientes' | 'emprestimos' | 'configuracoes';
 
 interface BottomNavBarProps {
   currentTab: TabType;
@@ -35,9 +35,9 @@ export default function BottomNavBar({
       icon: Users,
     },
     {
-      id: 'rotas' as TabType,
-      label: 'Rotas',
-      icon: Map,
+      id: 'emprestimos' as TabType,
+      label: 'Empréstimos',
+      icon: ArrowRightLeft,
     },
     {
       id: 'configuracoes' as TabType,
@@ -47,7 +47,7 @@ export default function BottomNavBar({
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 shadow-xl select-none">
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 shadow-xl select-none pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-md mx-auto flex flex-col">
         <div className="flex items-end justify-between relative py-1 px-2">
         {/* Left 2 tabs */}

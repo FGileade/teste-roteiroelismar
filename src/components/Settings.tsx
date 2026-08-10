@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import BackupRestore from './BackupRestore';
 import { 
   Mail, 
   Lock, 
@@ -16,22 +17,35 @@ import {
   Eye,
   EyeOff,
   Edit2,
-  Home
+  Home,
+  RefreshCw,
+  RotateCw
 } from 'lucide-react';
 import { updateEmail, updatePassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { Client } from '../types';
+import { exportClientsToExcel, ExcelImportReport, importClientsFromExcel } from '../lib/excelService';
 
 interface SettingsProps {
   onLogout: () => void;
   userEmail: string;
   onUpdateEmail: (newEmail: string) => void;
+  userId?: string;
+  clients: Client[];
+  onImportClients: (report: ExcelImportReport) => void;
 }
 
 export default function Settings({
   onLogout,
   userEmail,
   onUpdateEmail,
+  userId = 'local',
+  clients,
+  onImportClients,
 }: SettingsProps) {
+  const [isImportingClients, setIsImportingClients] = useState(false);
+  const [excelMessage, setExcelMessage] = useState('');
+  const [excelError, setExcelError] = useState('');
   // Access and Auth state
   const [currentEmail, setCurrentEmail] = useState(userEmail);
   const [newEmail, setNewEmail] = useState('');
@@ -60,6 +74,156 @@ export default function Settings({
   const [locationSuccess, setLocationSuccess] = useState('');
   const [locationError, setLocationError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
+
+  // Rotation preference state
+  const [allowRotation, setAllowRotation] = useState<boolean>(() => {
+    const saved = localStorage.getItem('roteiro_pet_allow_rotation');
+    return saved !== 'false';
+  });
+
+  const applyOrientation = (allowed: boolean) => {
+    try {
+      if (allowed) {
+        if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+          screen.orientation.unlock();
+        }
+      } else {
+        if (screen.orientation && typeof (screen.orientation as any).lock === 'function') {
+          (screen.orientation as any).lock('portrait').catch((err: any) => {
+            console.warn('Orientation lock failed:', err);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Screen orientation API not fully supported:', e);
+    }
+  };
+
+  const handleToggleRotation = () => {
+    const newVal = !allowRotation;
+    setAllowRotation(newVal);
+    localStorage.setItem('roteiro_pet_allow_rotation', String(newVal));
+    applyOrientation(newVal);
+  };
+
+  // Update states
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'up-to-date' | 'found' | 'downloading' | 'updating-files' | 'clearing-cache' | 'applying' | 'restarting' | 'success'>('idle');
+  const [updateMessage, setUpdateMessage] = useState('');
+
+  // Check if we just updated on mount
+  useEffect(() => {
+    const justUpdated = localStorage.getItem('app_just_updated');
+    if (justUpdated === 'true') {
+      setUpdateStatus('success');
+      setUpdateMessage('✅ Aplicação atualizada com sucesso.');
+      localStorage.removeItem('app_just_updated');
+      
+      const timer = setTimeout(() => {
+        setUpdateStatus('idle');
+        setUpdateMessage('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const runUpdateSequence = async () => {
+    const steps = [
+      { status: 'found', msg: '⬇ Encontramos uma nova versão.' },
+      { status: 'downloading', msg: '⬇ Baixando atualização...' },
+      { status: 'updating-files', msg: '⚙ Atualizando arquivos...' },
+      { status: 'clearing-cache', msg: '🧹 Atualizando cache...' },
+      { status: 'applying', msg: '♻ Aplicando atualização...' },
+      { status: 'restarting', msg: '🔄 Reiniciando aplicação...' }
+    ] as const;
+
+    for (const step of steps) {
+      setUpdateStatus(step.status);
+      setUpdateMessage(step.msg);
+      
+      if (step.status === 'clearing-cache') {
+        try {
+          const cacheNames = await caches.keys();
+          await Promise.all(
+            cacheNames.map(cacheName => caches.delete(cacheName))
+          );
+        } catch (e) {
+          console.warn('Erro ao limpar cache:', e);
+        }
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+
+    localStorage.setItem('app_just_updated', 'true');
+    window.location.reload();
+  };
+
+  const handleCheckUpdates = async () => {
+    if (!('serviceWorker' in navigator)) {
+      setUpdateStatus('checking');
+      setUpdateMessage('🔍 Procurando atualizações...');
+      setTimeout(() => {
+        setUpdateStatus('up-to-date');
+        setUpdateMessage('✔ Você já está utilizando a versão mais recente.');
+      }, 1500);
+      return;
+    }
+
+    try {
+      setUpdateStatus('checking');
+      setUpdateMessage('🔍 Procurando atualizações...');
+
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        setTimeout(() => {
+          setUpdateStatus('up-to-date');
+          setUpdateMessage('✔ Você já está utilizando a versão mais recente.');
+        }, 1500);
+        return;
+      }
+
+      let updateFound = false;
+
+      const onUpdateFound = () => {
+        updateFound = true;
+        const installingWorker = registration.installing;
+        if (installingWorker) {
+          installingWorker.onstatechange = () => {
+            // skipWaiting() faz o SW ir direto para activating/activated,
+            // nunca passando por 'installed' (waiting). Escutar os estados corretos:
+            if (
+              installingWorker.state === 'activating' ||
+              installingWorker.state === 'activated'
+            ) {
+              runUpdateSequence();
+            }
+          };
+        }
+      };
+
+      registration.addEventListener('updatefound', onUpdateFound);
+
+      await registration.update();
+
+      // Aumentado para 4s para cobrir conexões lentas
+      setTimeout(() => {
+        registration.removeEventListener('updatefound', onUpdateFound);
+        if (!updateFound && !registration.waiting && !registration.installing) {
+          setUpdateStatus('up-to-date');
+          setUpdateMessage('✔ Você já está utilizando a versão mais recente.');
+        } else if (registration.waiting) {
+          // SW em waiting: forçar skip via mensagem
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          runUpdateSequence();
+        }
+      }, 4000);
+
+    } catch (error) {
+      console.error('Erro ao verificar atualizações:', error);
+      setUpdateStatus('up-to-date');
+      setUpdateMessage('✔ Você já está utilizando a versão mais recente.');
+    }
+  };
 
   // Load saved credentials and office location on mount
   useEffect(() => {
@@ -629,6 +793,123 @@ export default function Settings({
           </form>
         </div>
 
+        {/* SCREEN ORIENTATION BOX */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div className="flex items-center gap-2">
+              <RotateCw className="w-5 h-5 text-indigo-600" />
+              <h2 className="font-bold text-slate-800 text-sm">Tela e Orientação</h2>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Rotacionar tela</h3>
+              <p className="text-[11px] text-slate-400 font-medium">Permitir que a tela gire automaticamente para o modo paisagem.</p>
+            </div>
+            <button
+              id="toggle_rotation_btn"
+              type="button"
+              onClick={handleToggleRotation}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                allowRotation ? 'bg-indigo-600' : 'bg-slate-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                  allowRotation ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* UPDATE BOX */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-blue-600" />
+              <h2 className="font-bold text-slate-800 text-sm">Atualizações</h2>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <p className="text-xs text-slate-500 font-medium">
+              Mantenha sua aplicação sempre atualizada.
+            </p>
+
+            {updateMessage && (
+              <div className={`flex items-center gap-2 border text-xs p-3 rounded-xl ${
+                updateStatus === 'success' || updateStatus === 'up-to-date'
+                  ? 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                  : 'bg-blue-50 border-blue-100 text-blue-700 font-medium'
+              }`}>
+                {updateStatus === 'success' || updateStatus === 'up-to-date' ? (
+                  <CheckCircle className="w-4 h-4 shrink-0" />
+                ) : (
+                  <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0"></span>
+                )}
+                <span className="font-semibold">{updateMessage}</span>
+              </div>
+            )}
+
+            <button
+              id="check_updates_btn"
+              type="button"
+              onClick={handleCheckUpdates}
+              disabled={updateStatus !== 'idle' && updateStatus !== 'success' && updateStatus !== 'up-to-date'}
+              className={`w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-xs transition-colors cursor-pointer ${
+                (updateStatus !== 'idle' && updateStatus !== 'success' && updateStatus !== 'up-to-date') ? 'opacity-70 cursor-wait' : ''
+              }`}
+            >
+              <RefreshCw className={`w-4 h-4 ${(updateStatus !== 'idle' && updateStatus !== 'success' && updateStatus !== 'up-to-date') ? 'animate-spin' : ''}`} />
+              <span>Procurar Atualizações</span>
+            </button>
+          </div>
+        </div>
+
+        {/* BACKUP & RESTORE */}
+        <BackupRestore userId={userId} />
+
+        {/* EXCEL SYNC */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm">Sincronização de Planilha</h2>
+              <p className="text-[11px] text-slate-400 mt-1">Importe a aba CARIACICA_VIANA ou exporte a base atual.</p>
+            </div>
+          </div>
+          <input
+            id="clients_excel_upload"
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="block w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-xs file:font-bold file:text-blue-700"
+            disabled={isImportingClients}
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              setExcelMessage(''); setExcelError(''); setIsImportingClients(true);
+              try {
+                const report = await importClientsFromExcel(file, clients);
+                onImportClients(report);
+                setExcelMessage(`Importação concluída: ${report.created} criados, ${report.updated} atualizados e ${report.ignored} ignorados.`);
+                if (report.warnings.length) setExcelError(report.warnings.slice(0, 3).join(' '));
+              } catch (error: any) {
+                setExcelError(error?.message || 'Não foi possível importar a planilha.');
+              } finally {
+                setIsImportingClients(false);
+                event.target.value = '';
+              }
+            }}
+            aria-label="Selecionar planilha Excel de clientes"
+          />
+          {excelMessage && <div className="mt-3 flex items-center gap-2 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs p-3 rounded-xl"><CheckCircle className="w-4 h-4 shrink-0" /><span>{excelMessage}</span></div>}
+          {excelError && <div className="mt-3 flex items-center gap-2 bg-amber-50 border border-amber-100 text-amber-700 text-xs p-3 rounded-xl"><AlertCircle className="w-4 h-4 shrink-0" /><span>{excelError}</span></div>}
+          <button type="button" onClick={() => exportClientsToExcel(clients)} className="w-full mt-3 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-3 px-4 rounded-xl transition-colors" disabled={!clients.length}>
+            <Save className="w-4 h-4" /> Baixar Planilha Atualizada (.xlsx)
+          </button>
+        </div>
+
         {/* LOGOUT BOX */}
         <div className="bg-slate-100 border border-slate-200/80 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-center sm:text-left">
@@ -649,4 +930,3 @@ export default function Settings({
     </div>
   );
 }
-

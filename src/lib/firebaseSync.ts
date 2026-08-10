@@ -11,10 +11,23 @@ import {
   deleteDoc, 
   writeBatch,
   query,
-  getDoc
+  getDoc,
+  limit
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Client, Visit, NegotiationHistory, VoiceNote, AgendaEvent } from '../types';
+import { Client, Visit, NegotiationHistory, VoiceNote, AgendaEvent, ProductLoan } from '../types';
+
+// UIDs que compartilham o mesmo banco de dados (acesso idêntico)
+const MASTER_UID = 'OJtAzjEd9BhU9LQN9R52hP7gjkb2';
+const SHARED_UIDS: string[] = ['KQBu6SfAcMSCKBrgp6dlxkQ2Zna2'];
+
+/**
+ * Resolve o UID efetivo para acesso ao Firestore.
+ * UIDs secundários são redirecionados para o MASTER_UID, compartilhando os mesmos dados.
+ */
+export function resolveUserId(uid: string): string {
+  return SHARED_UIDS.includes(uid) ? MASTER_UID : uid;
+}
 
 /**
  * Checks if the user already has data stored in Firestore.
@@ -22,7 +35,7 @@ import { Client, Visit, NegotiationHistory, VoiceNote, AgendaEvent } from '../ty
 export async function hasCloudData(userId: string): Promise<boolean> {
   try {
     const clientsCol = collection(db, 'users', userId, 'clients');
-    const snapshot = await getDocs(query(clientsCol));
+    const snapshot = await getDocs(query(clientsCol, limit(1)));
     return !snapshot.empty;
   } catch (e) {
     console.error('Error checking cloud data:', e);
@@ -75,6 +88,14 @@ export async function downloadUserData(userId: string) {
       agendaEvents.push(doc.data() as AgendaEvent);
     });
 
+    // 4.6. Get Product Loans
+    const loansCol = collection(db, 'users', userId, 'loans');
+    const loansSnap = await getDocs(loansCol);
+    const loans: ProductLoan[] = [];
+    loansSnap.forEach(doc => {
+      loans.push(doc.data() as ProductLoan);
+    });
+
     // 5. Get Initialized Dates
     const configDoc = doc(db, 'users', userId, 'config', 'dates');
     const configSnap = await getDoc(configDoc);
@@ -89,6 +110,7 @@ export async function downloadUserData(userId: string) {
       negotiations,
       voiceNotes,
       agendaEvents,
+      loans,
       initializedDates
     };
   } catch (e) {
@@ -165,6 +187,7 @@ export async function uploadAllUserData(
     negotiations: NegotiationHistory[];
     voiceNotes: VoiceNote[];
     agendaEvents: AgendaEvent[];
+    loans: ProductLoan[];
     initializedDates: string[];
   }
 ) {
@@ -174,6 +197,7 @@ export async function uploadAllUserData(
     await uploadCollection(userId, 'negotiations', data.negotiations);
     await uploadCollection(userId, 'voiceNotes', data.voiceNotes);
     await uploadCollection(userId, 'events', data.agendaEvents);
+    await uploadCollection(userId, 'loans', data.loans);
     
     const configDoc = doc(db, 'users', userId, 'config', 'dates');
     await setDoc(configDoc, { dates: data.initializedDates });
@@ -194,3 +218,87 @@ export async function saveInitializedDatesToCloud(userId: string, dates: string[
     console.error('Error saving initialized dates to cloud:', e);
   }
 }
+
+/**
+ * Sincroniza a diferença incremental entre dois arrays de itens para o Firestore.
+ * Não realiza leituras no banco de dados e grava/deleta apenas os documentos modificados.
+ */
+export async function syncArrayToCloud<T extends { id: string }>(
+  userId: string,
+  collectionName: string,
+  oldItems: T[],
+  newItems: T[]
+) {
+  try {
+    const oldMap = new Map(oldItems.map(item => [item.id, item]));
+    const newMap = new Map(newItems.map(item => [item.id, item]));
+
+    const toSet: T[] = [];
+    const toDelete: string[] = [];
+
+    // Identificar itens novos ou atualizados
+    for (const item of newItems) {
+      const oldItem = oldMap.get(item.id);
+      if (!oldItem || JSON.stringify(oldItem) !== JSON.stringify(item)) {
+        toSet.push(item);
+      }
+    }
+
+    // Identificar itens removidos
+    for (const item of oldItems) {
+      if (!newMap.has(item.id)) {
+        toDelete.push(item.id);
+      }
+    }
+
+    // Se nenhuma modificação foi feita, sai prematuramente (0 operações)
+    if (toSet.length === 0 && toDelete.length === 0) {
+      return;
+    }
+
+    const colRef = collection(db, 'users', userId, collectionName);
+
+    // Se houver apenas 1 alteração simples, faz o setDoc/deleteDoc individual direto
+    if (toSet.length + toDelete.length === 1) {
+      if (toSet.length === 1) {
+        const item = toSet[0];
+        await setDoc(doc(colRef, item.id), item);
+      } else {
+        const id = toDelete[0];
+        await deleteDoc(doc(colRef, id));
+      }
+      return;
+    }
+
+    // Para múltiplas alterações, agrupa as operações em lotes atômicos (limite de 400 por lote)
+    let batch = writeBatch(db);
+    let count = 0;
+
+    for (const id of toDelete) {
+      batch.delete(doc(colRef, id));
+      count++;
+      if (count === 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+
+    for (const item of toSet) {
+      batch.set(doc(colRef, item.id), item);
+      count++;
+      if (count === 400) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+
+    if (count > 0) {
+      await batch.commit();
+    }
+  } catch (e) {
+    console.error(`Erro ao sincronizar coleção ${collectionName} por deltas:`, e);
+  }
+}
+

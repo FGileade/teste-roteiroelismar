@@ -108,3 +108,11 @@ export const getLocalTodayString = (): string => {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+/**
+ * Retorna o nome do cliente a ser exibido nos cards com base nas preferências configuradas.
+ */
+export const getClientDisplayName = (client: { name: string; legalName?: string; displayNameType?: 'name' | 'legalName' }): string => {
+  return client.displayNameType === 'legalName' && client.legalName ? client.legalName : client.name;
+};
+

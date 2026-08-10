@@ -11,6 +11,7 @@ export interface Client {
   id: string;
   name: string; // Nome Fantasia
   legalName?: string; // Razão Social
+  displayNameType?: 'name' | 'legalName'; // Qual nome exibir nos cards
   buyerName: string; // Nome do Comprador
   phone: string; // Telefone / WhatsApp
   address: string; // Endereço completo
@@ -21,8 +22,10 @@ export interface Client {
   frequency: RouteFrequency;
   weekday?: WeekDay; // Monday to Saturday
   weekOffset?: 0 | 1; // Used for "every 2 weeks" (bi-weekly rotation)
+  monthWeek?: 1 | 2 | 3 | 4 | 5; // Used for monthly rotation (1st to 5th week of the month)
   routeOrder: number; // Order sequence in the route of that day
   createdAt: string;
+  externalCode?: string;
 }
 
 export type VisitStatus = 'pending' | 'completed' | 'canceled';
@@ -82,5 +85,22 @@ export interface AgendaEvent {
   clientName?: string;
   reminderMinutes?: number; // minutes before event to notify
   notificationScheduledAt?: string; // ISO timestamp when notif was scheduled
+  status?: 'agendado' | 'concluido' | 'cancelado';
+  createdAt: string;
+}
+
+export interface ProductLoan {
+  id: string;
+  originClientId: string;
+  originClientName: string;
+  destClientId: string;
+  destClientName: string;
+  productName: string;
+  quantity: string;
+  date: string;
+  status: 'pending' | 'resolved';
+  notes?: string;
+  returnDate?: string;
+  returnNotes?: string;
   createdAt: string;
 }

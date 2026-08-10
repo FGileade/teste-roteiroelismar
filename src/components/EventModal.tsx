@@ -15,8 +15,10 @@ import {
   Save,
   Trash2,
   ChevronDown,
+  Search,
 } from 'lucide-react';
 import { AgendaEvent, EventType, Client } from '../types';
+import { getClientDisplayName } from '../utils';
 
 // ─── Color palette per event type ────────────────────────────────────────────
 export const EVENT_COLORS: Record<EventType, { bg: string; border: string; text: string; badge: string; dot: string }> = {
@@ -40,7 +42,7 @@ export const EXTRA_VISIT_COLOR = { bg: 'bg-blue-50', border: 'border-blue-400', 
 
 // ─── Push Notification helper ────────────────────────────────────────────────
 export async function requestNotificationPermission(): Promise<boolean> {
-  if (!('Notification' in window)) return false;
+  if (typeof window === 'undefined' || !('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
   if (Notification.permission === 'denied') return false;
   const result = await Notification.requestPermission();
@@ -114,7 +116,10 @@ export default function EventModal({
   const [clientId, setClientId] = useState('');
   const [reminderMinutes, setReminderMinutes] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [notifGranted, setNotifGranted] = useState(Notification.permission === 'granted');
+  const [notifGranted, setNotifGranted] = useState(
+    typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted'
+  );
+  const [clientSearch, setClientSearch] = useState('');
 
   // Populate fields when editing
   useEffect(() => {
@@ -129,6 +134,7 @@ export default function EventModal({
       setNotes(editingEvent.notes || '');
       setClientId(editingEvent.clientId || '');
       setReminderMinutes(editingEvent.reminderMinutes || 0);
+      setClientSearch('');
     } else {
       setTitle('');
       setType('reuniao');
@@ -141,6 +147,7 @@ export default function EventModal({
       setClientId('');
       setReminderMinutes(0);
       setConfirmDelete(false);
+      setClientSearch('');
     }
   }, [editingEvent, initialDate, isOpen]);
 
@@ -166,7 +173,7 @@ export default function EventModal({
       location: location.trim() || undefined,
       notes: notes.trim() || undefined,
       clientId: clientId || undefined,
-      clientName: linkedClient?.name || undefined,
+      clientName: linkedClient ? getClientDisplayName(linkedClient) : undefined,
       reminderMinutes: reminderMinutes || undefined,
       createdAt: editingEvent?.createdAt || new Date().toISOString(),
     };
@@ -249,6 +256,7 @@ export default function EventModal({
           <input
             id="event_date"
             type="date"
+            inputMode="numeric"
             required
             value={date}
             onChange={e => setDate(e.target.value)}
@@ -311,6 +319,16 @@ export default function EventModal({
         {/* Vincular Cliente */}
         <div className="space-y-1">
           <label className="text-xs font-bold text-slate-600 block flex items-center gap-1"><User className="w-3.5 h-3.5" /> Vincular Cliente (opcional)</label>
+          <div className="relative mb-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Buscar cliente..."
+              value={clientSearch}
+              onChange={(e) => setClientSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 bg-slate-50/50"
+            />
+          </div>
           <div className="relative">
             <select
               id="event_client_link"
@@ -319,9 +337,15 @@ export default function EventModal({
               className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 bg-slate-50/50 appearance-none pr-8"
             >
               <option value="">— Nenhum cliente vinculado —</option>
-              {clients.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
+              {clients
+                .filter(c => {
+                  return c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+                    (c.legalName && c.legalName.toLowerCase().includes(clientSearch.toLowerCase()));
+                })
+                .sort((a, b) => getClientDisplayName(a).localeCompare(getClientDisplayName(b), 'pt-BR'))
+                .map(c => (
+                  <option key={c.id} value={c.id}>{getClientDisplayName(c)}</option>
+                ))}
             </select>
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           </div>

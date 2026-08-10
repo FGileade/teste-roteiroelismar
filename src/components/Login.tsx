@@ -38,33 +38,19 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       if (userCredential.user && userCredential.user.email) {
         localStorage.setItem('roteiro_pet_is_logged_in', 'true');
         localStorage.setItem('roteiro_pet_user_email', userCredential.user.email);
+        localStorage.removeItem('roteiro_pet_offline_mode');
         onLoginSuccess(userCredential.user.email);
         setIsLoading(false);
         return;
       }
     } catch (firebaseErr: any) {
-      console.warn('Firebase login error, checking offline/fallback credentials:', firebaseErr);
+      console.warn('Firebase login error:', firebaseErr);
       
-      // 2. Fallback to local/offline credentials so that the user can still access if not registered yet
-      const storedEmail = localStorage.getItem('roteiro_pet_user_email') || 'elismar.bolzani@gmail.com';
-      const storedPassword = localStorage.getItem('roteiro_pet_user_password') || 'elismar123';
-
-      if (
-        trimmedEmail.toLowerCase() === storedEmail.toLowerCase() &&
-        trimmedPassword === storedPassword
-      ) {
-        localStorage.setItem('roteiro_pet_is_logged_in', 'true');
-        localStorage.setItem('roteiro_pet_user_email', trimmedEmail.toLowerCase());
-        onLoginSuccess(trimmedEmail.toLowerCase());
-        setIsLoading(false);
-        return;
-      }
-
       // Handle specific Firebase Auth errors nicely
       let userFriendlyMsg = 'E-mail ou senha incorretos. Tente novamente.';
       if (firebaseErr.code === 'auth/network-request-failed') {
-        userFriendlyMsg = 'Erro de rede. Verifique sua conexão com a internet.';
-      } else if (firebaseErr.code === 'auth/invalid-credential') {
+        userFriendlyMsg = 'É necessário conectar-se à internet para realizar o primeiro acesso neste dispositivo.';
+      } else if (firebaseErr.code === 'auth/invalid-credential' || firebaseErr.code === 'auth/wrong-password' || firebaseErr.code === 'auth/user-not-found') {
         userFriendlyMsg = 'Credenciais incorretas ou inexistentes. Verifique os dados.';
       } else if (firebaseErr.message) {
         userFriendlyMsg = `Erro: ${firebaseErr.message}`;
@@ -84,6 +70,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       if (result.user && result.user.email) {
         localStorage.setItem('roteiro_pet_is_logged_in', 'true');
         localStorage.setItem('roteiro_pet_user_email', result.user.email);
+        localStorage.removeItem('roteiro_pet_offline_mode');
         onLoginSuccess(result.user.email);
       }
     } catch (e: any) {

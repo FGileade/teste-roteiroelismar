@@ -1,11 +1,37 @@
-const CACHE_NAME = 'roteiro-elismar-cache-v1';
+const CACHE_NAME = 'roteiro-elismar-cache-v4';
+const APP_SHELL = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/favicon.png',
+  '/apple-touch-icon.png',
+  '/icon-192.png',
+  '/icon-512.png'
+];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      )
+    ).then(() => self.clients.claim())
+  );
+});
+
+// Fallback: caso o SW fique em estado waiting, permite skip via postMessage
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
