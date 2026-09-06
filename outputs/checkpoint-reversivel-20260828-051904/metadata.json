@@ -1,0 +1,6 @@
+{
+  "name": "roteiroelismar",
+  "description": "Agenda inteligente, rotas otimizadas (Waze/Maps), cadastro de clientes e histórico de negociações para vendedores do setor pet.",
+  "requestFramePermissions": ["geolocation", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

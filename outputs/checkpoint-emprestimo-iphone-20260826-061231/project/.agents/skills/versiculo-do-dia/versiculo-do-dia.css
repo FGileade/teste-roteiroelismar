@@ -1,0 +1,73 @@
+.versiculo-banner {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  width: 360px;
+  max-width: 90vw;
+
+  /* ABSORÇÃO DE CORES DA APLICAÇÃO */
+  /* Tenta pegar o fundo de cards/papeis do app, se não achar, usa a cor de fundo padrão, ou branco */
+  background: var(--bg-card, var(--background-paper, var(--background-color, #ffffff)));
+  /* Tenta pegar a cor do texto principal do seu app */
+  color: var(--text-primary, var(--text-color, #333333));
+  /* Herda a família de fontes da sua aplicação */
+  font-family: inherit; 
+  /* Tenta usar o arredondamento padrão do app, senão usa os seus 24px */
+  border-radius: var(--border-radius, 24px);
+  /* Uma leve borda adaptável para o caso de fundos muito claros/escuros */
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.08));
+
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .15);
+  z-index: 99999;
+  animation: slideUp .4s ease;
+}
+
+.versiculo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 700;
+  /* Opcional: foca na cor primária (destaque) do seu app para o título */
+  color: var(--primary-color, inherit);
+}
+
+#fechar-versiculo {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 20px;
+  /* Herda a cor do texto do banner e ganha uma opacidade suave */
+  color: inherit;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+#fechar-versiculo:hover {
+  opacity: 1;
+}
+
+#versiculo-texto {
+  font-size: 20px;
+  font-style: italic;
+  margin-bottom: 12px;
+  /* Cor sutilmente mais suave para o corpo do texto se o app tiver essa variável */
+  color: var(--text-secondary, inherit);
+}
+
+#versiculo-ref {
+  text-align: right;
+  font-weight: 700;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

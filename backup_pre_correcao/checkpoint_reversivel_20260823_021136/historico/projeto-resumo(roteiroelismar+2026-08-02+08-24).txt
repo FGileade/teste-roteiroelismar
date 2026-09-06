@@ -1,0 +1,41 @@
+===============================================================================
+RESUMO E BACKUP DO PROJETO - ROTEIRO ELISMAR
+Data e Horário: 2026-08-02 08:24
+===============================================================================
+
+1. NOME E OBJETIVO DO PROJETO
+-------------------------------------------------------------------------------
+Nome: roteiroelismar (Gestor de Rotas - Elismar / Gileade HUB)
+Descrição: Aplicação PWA para gestão de rotas de vendas de ração de pet shops.
+Permite acompanhamento de visitas, controle de negociações, empréstimos de sacos 
+de ração entre clientes, transcrição de áudio via Web Speech API e navegação direta via mapas.
+
+2. STACK TECNOLÓGICA & DEPENDÊNCIAS
+-------------------------------------------------------------------------------
+- Frontend: React 19, TypeScript, Vite 6, Tailwind CSS v4, Lucide React, Motion.
+- Backend/Server: Node.js + Express (server.ts).
+- Banco de Dados & Autenticação: Cloud Firestore, Firebase Authentication.
+- Deploy: Firebase Hosting (Frontend SPA/PWA estático).
+- Fila Offline: LocalStorage transacional em syncQueue.ts para sincronismo em batch.
+
+3. ARQUITETURA E ESTRUTURA DE PASTAS
+-------------------------------------------------------------------------------
+- src/: Código fonte da aplicação React (componentes, páginas, hooks, serviços Firebase).
+- public/: Manifest PWA, ícones, service worker e assets estáticos.
+- server.ts: Servidor Express local e utilitários backend.
+- firestore.rules & firebase.json: Configurações de segurança e deploy do Firebase.
+- historico/: Registros históricos de atualizações do projeto.
+
+4. COMO EXECUTAR O PROJETO
+-------------------------------------------------------------------------------
+- Desenvolvimento local: npm run dev (inicia via tsx server.ts)
+- Build de produção: npm run build (gera dist/ estático e dist/server.cjs)
+- Deploy no Firebase: firebase deploy --only hosting
+
+5. LOCALIZAÇÃO DOS BACKUPS
+-------------------------------------------------------------------------------
+- Cópia do projeto (código fonte completo sem node_modules/.git):
+  C:\Users\filip\.gemini\antigravity\scratch\2. BACKUP DE PROJETOS\roteiroelismar_backup_20260802-0824
+- Histórico Markdown:
+  c:\Users\filip\.gemini\antigravity\scratch\1. PROJETOS\roteiroelismar\historico\README(roteiroelismar+2026-08-02+08-24).md
+===============================================================================

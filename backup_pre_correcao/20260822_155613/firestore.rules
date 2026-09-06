@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // UIDs autorizados a compartilhar o mesmo banco de dados
+    function isMasterOrShared(uid) {
+      return uid == 'OJtAzjEd9BhU9LQN9R52hP7gjkb2'
+          || uid == 'KQBu6SfAcMSCKBrgp6dlxkQ2Zna2';
+    }
+
+    // Usuário autenticado e autorizado
+    function isAuthorized() {
+      return request.auth != null && isMasterOrShared(request.auth.uid);
+    }
+
+    // Acesso ao path de dados: permite se for o próprio nó do usuário ou se for o nó do Master compartilhado com usuários autorizados
+    match /users/{userId}/{document=**} {
+      allow read, write, delete: if request.auth != null && (
+        userId == request.auth.uid ||
+        (userId == 'OJtAzjEd9BhU9LQN9R52hP7gjkb2' && (
+          request.auth.uid == 'OJtAzjEd9BhU9LQN9R52hP7gjkb2' || 
+          request.auth.uid == 'KQBu6SfAcMSCKBrgp6dlxkQ2Zna2'
+        ))
+      );
+    }
+
+    // Negar acesso a qualquer outro path explicitamente
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

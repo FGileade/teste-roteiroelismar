@@ -1,0 +1,41 @@
+RESUMO DE CONTINUIDADE — ROTEIRO ELISMAR
+Data: 2026-08-24
+
+1. REGRA DE PRODUÇÃO
+O Roteiro Elismar está em produção e é usado por usuários finais. Não alterar código, Firebase, regras, configuração ou deploy sem autorização explícita do proprietário. Novas telas e fluxos devem ser desenvolvidos primeiro no Google Stitch.
+
+2. DOCUMENTOS IMPORTANTES
+- historico/README(roteiroelismar+2026-08-24+11-59).md
+- regrasdenegocio.md — referência principal do comportamento ativo
+- package.json — scripts e dependências atuais
+- firebase.json — configuração de Hosting
+- firestore.rules — regras de acesso
+
+3. TECNOLOGIAS
+React, Vite, TypeScript, Tailwind, Firebase Auth/Firestore/Hosting, Express/tsx, armazenamento local, sincronização offline e exportação/importação Excel.
+
+4. FUNCIONALIDADES ATIVAS
+Autenticação por e-mail e Google; agenda e roteiro; visitas recorrentes e extras; conclusão, cancelamento e reagendamento; clientes; negociações; empréstimos; eventos; notas de voz; backup/restauração JSON; Excel; localização; atualização PWA; manifest; service worker; fallback offline; assinatura Developed by Gileade HUB.
+
+5. STITCH
+Projeto: Roteiro Elismar Mobile Sales Hub
+URL: https://stitch.withgoogle.com/projects/13959033504928489482
+
+Fase 1 concluída: fundação visual, modo claro, offline/sincronização, conflitos, gráficos e estados de interface.
+Fase 2 concluída: login, Google, modo local, recuperação, sessão expirada, unidade, perfis, permissão e logout.
+Próxima fase: Fase 3 — Agenda e Roteiro de Visitas.
+
+6. PLANO DA FASE 3
+Criar no Stitch: agenda e seletor de data; estados de visitas; detalhe da visita; conclusão com nota manual/voz; cancelar; reagendar; desfazer; eventos; Waze/Maps/WhatsApp; loading, vazio, erro, sucesso e offline.
+
+7. REGRAS GRATUITAS
+Não criar API key paga. Não ativar faturamento ou Blaze. Não usar modelos pagos, Search ou ferramentas com cobrança. Não inserir dados reais ou secrets. Manter serviços Firebase somente nas cotas gratuitas.
+
+8. VALIDAÇÃO VISUAL
+Testar de 320 px a 1440 px; safe areas; toque mínimo de 44 px; WCAG AA; foco de teclado; teclado virtual; modais/drawers; estados de erro e offline; nenhum overflow horizontal. Falha crítica significa BLOQUEADO PARA PRODUÇÃO.
+
+9. RETOMADA
+Ler o README desta pasta e regrasdenegocio.md. Abrir o projeto no Stitch. Revisar Fases 1 e 2. Apresentar o plano da Fase 3 e pedir confirmação antes de enviar o prompt. Criar apenas no Stitch. Registrar pendências. Não modificar o repositório até nova autorização explícita.
+
+10. OBSERVAÇÃO TÉCNICA
+O Stitch é protótipo visual. Backend, autenticação real, regras de segurança, PWA instalável e sincronização precisam de validação no código em etapa posterior autorizada. O diretório de trabalho já contém alterações locais; preservar tudo.

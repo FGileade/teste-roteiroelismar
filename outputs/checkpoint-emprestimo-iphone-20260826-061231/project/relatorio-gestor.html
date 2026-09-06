@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resumo de Melhorias - Roteiro Elismar</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Plus+Jakarta+Sans:wght@400;500;700&display=swap');
+
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #eff6ff;
+      --text: #334155;
+      --text-dark: #0f172a;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--text);
+      line-height: 1.5;
+      padding: 40px;
+      background-color: #f8fafc;
+    }
+
+    .container {
+      max-width: 650px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(15, 23, 42, 0.04);
+      border: 1px solid var(--border);
+    }
+
+    header {
+      border-bottom: 2px solid var(--primary-light);
+      padding-bottom: 15px;
+      margin-bottom: 25px;
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      color: var(--primary);
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    h2 {
+      font-family: 'Outfit', sans-serif;
+      color: var(--text-dark);
+      font-size: 15px;
+      font-weight: 600;
+      margin-top: 20px;
+      margin-bottom: 8px;
+    }
+
+    p, li {
+      font-size: 13px;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    ul {
+      padding-left: 20px;
+      margin-bottom: 15px;
+    }
+
+    .footer {
+      margin-top: 30px;
+      border-top: 1px solid var(--border);
+      padding-top: 15px;
+      text-align: center;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+
+    @media print {
+      body { background-color: white; padding: 0; }
+      .container { box-shadow: none; border: none; padding: 0; }
+      .no-print { display: none; }
+    }
+
+    .print-btn-container { text-align: center; margin-bottom: 15px; }
+    .print-btn {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 755;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Outfit', sans-serif;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="print-btn-container no-print">
+    <button class="print-btn" onclick="window.print()">Salvar como PDF / Imprimir</button>
+  </div>
+
+  <div class="container">
+    <header>
+      <h1>Resumo de Melhorias — Roteiro Elismar</h1>
+      <p class="subtitle">Data: 16 de Julho de 2026 | Desenvolvido por Gileade HUB</p>
+    </header>
+
+    <p>Abaixo estão explicadas de forma simples as duas melhorias adicionadas hoje no aplicativo:</p>
+
+    <h2>1. Ajuste na Exibição do Nome dos Clientes</h2>
+    <ul>
+      <li><strong>O que mudou:</strong> Agora o aplicativo respeita corretamente a escolha de exibir o <strong>Nome Fantasia</strong> ou a <strong>Razão Social</strong> em todas as telas (visitas, listas e buscas).</li>
+      <li><strong>Busca Inteligente:</strong> Ao pesquisar clientes, o vendedor pode digitar tanto o Nome Fantasia quanto a Razão Social que o sistema irá encontrar.</li>
+      <li><strong>Segurança:</strong> Nenhum dado antigo foi alterado ou apagado.</li>
+    </ul>
+
+    <h2>2. Atalho de Empréstimos na Barra Inferior</h2>
+    <ul>
+      <li><strong>O que mudou:</strong> Foi criado um botão rápido de <strong>"Empréstimos"</strong> na barra de baixo (entre o botão de gravar voz e as configurações).</li>
+      <li><strong>Praticidade:</strong> O vendedor não precisa mais entrar em várias telas para achar os empréstimos. Agora ele acessa a lista de empréstimo de ração com apenas 1 clique.</li>
+    </ul>
+
+    <p style="margin-top: 20px; font-weight: bold; color: var(--primary);">O aplicativo já está atualizado e funcionando na internet de forma segura.</p>
+
+    <div class="footer">
+      Developed by Gileade HUB
+    </div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 500);
+    };
+  </script>
+</body>
+</html>
